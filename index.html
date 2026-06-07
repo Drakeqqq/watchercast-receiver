@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WatcherCast Receiver</title>
+
+    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+</head>
+<body>
+
+<script>
+const context = cast.framework.CastReceiverContext.getInstance();
+
+const playerManager = context.getPlayerManager();
+
+playerManager.setMessageInterceptor(
+    cast.framework.messages.MessageType.LOAD,
+    requestData => {
+        console.log("WATCHERCAST LOAD", requestData);
+        return requestData;
+    }
+);
+
+context.start();
+</script>
+
+</body>
+</html>
