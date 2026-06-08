@@ -37,21 +37,24 @@
 
 
 
-
 #subtitleBox {
     position: absolute;
 
     left: 50%;
-    bottom: 80px;
+    bottom: 28px;
 
     transform: translateX(-50%);
 
+    width: 92%;
+    max-width: 92%;
+
     color: white;
-    font-size: 42px;
+    font-size: 36px;
     font-family: Arial, sans-serif;
     font-weight: bold;
 
     text-align: center;
+    line-height: 1.18;
 
     text-shadow:
         2px 2px 4px black,
@@ -59,13 +62,9 @@
         2px -2px 4px black,
         -2px 2px 4px black;
 
-    max-width: 90%;
-
     z-index: 9999;
+    pointer-events: none;
 }
-
-
-
 
 
 
@@ -82,7 +81,7 @@
 </head>
 
 <body>
-    <div id="status">DRAKE V3</div>
+    <div id="status">DRAKE V4</div>
 
     <video id="video" autoplay controls></video>
     <div id="subtitleBox"></div>
