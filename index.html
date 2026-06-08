@@ -4,25 +4,44 @@
     <meta charset="utf-8">
     <title>WatcherCast Receiver</title>
 
-    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+
+    <style>
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            overflow: hidden;
+        }
+
+        cast-media-player {
+            width: 100%;
+            height: 100%;
+            --theme-hue: 210;
+            --splash-image: none;
+            --splash-size: cover;
+            --watermark-image: none;
+        }
+    </style>
 </head>
+
 <body>
+    <cast-media-player></cast-media-player>
 
-<script>
-const context = cast.framework.CastReceiverContext.getInstance();
+    <script>
+        const context = cast.framework.CastReceiverContext.getInstance();
+        const playerManager = context.getPlayerManager();
 
-const playerManager = context.getPlayerManager();
+        playerManager.setMessageInterceptor(
+            cast.framework.messages.MessageType.LOAD,
+            requestData => {
+                console.log("WATCHERCAST LOAD:", requestData);
+                return requestData;
+            }
+        );
 
-playerManager.setMessageInterceptor(
-    cast.framework.messages.MessageType.LOAD,
-    requestData => {
-        console.log("WATCHERCAST LOAD", requestData);
-        return requestData;
-    }
-);
-
-context.start();
-</script>
-
+        context.start();
+    </script>
 </body>
 </html>
