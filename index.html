@@ -81,7 +81,7 @@
 </head>
 
 <body>
-    <div id="status">DRAKE V8</div>
+    <div id="status">DRAKE V9</div>
 
     <video id="video" autoplay controls></video>
     <div id="subtitleBox"></div>
@@ -102,6 +102,7 @@
     const video = document.getElementById("video");
     const statusBox = document.getElementById("status");
     const subtitleBox = document.getElementById("subtitleBox");
+    const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
 
     let subtitleCues = [];
 
@@ -243,6 +244,54 @@ setStatus(
             return null;
         }
     );
+
+
+
+
+
+
+context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
+    const command = event.data;
+
+    console.log("WATCHERCAST CONTROL:", command);
+
+    if (!command || !command.action) {
+        return;
+    }
+
+    if (command.action === "pause") {
+        video.pause();
+        setStatus("PAUSE");
+    }
+
+    if (command.action === "play") {
+        video.play();
+        setStatus("PLAY");
+    }
+
+    if (command.action === "toggle") {
+        if (video.paused) {
+            video.play();
+            setStatus("PLAY");
+        } else {
+            video.pause();
+            setStatus("PAUSE");
+        }
+    }
+
+    if (command.action === "seekBy") {
+        const offset = Number(command.offset || 0);
+        video.currentTime = Math.max(0, video.currentTime + offset);
+        setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+    }
+
+    if (command.action === "stop") {
+        video.pause();
+        video.currentTime = 0;
+        setStatus("STOP");
+    }
+});
+
 
     context.start();
 </script>
