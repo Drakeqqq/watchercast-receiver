@@ -85,6 +85,35 @@
                         track.default = true;
 
                         video.appendChild(track);
+                        fetch(firstTextTrack.trackContentId)
+    .then(response => response.text())
+    .then(text => {
+        setStatus(
+            "VTT DOWNLOAD OK\n" +
+            text.substring(0, 100)
+        );
+    })
+    .catch(error => {
+        setStatus(
+            "VTT DOWNLOAD ERROR\n" +
+            error.message
+        );
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 track.addEventListener("load", () => {
     if (video.textTracks && video.textTracks.length > 0) {
