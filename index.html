@@ -15,42 +15,97 @@
             overflow: hidden;
         }
 
-        cast-media-player {
+        #video {
             width: 100%;
             height: 100%;
-            --theme-hue: 210;
-            --splash-image: none;
-            --splash-size: cover;
-            --watermark-image: none;
+            background: black;
+        }
+
+        #status {
+            position: absolute;
+            left: 30px;
+            top: 30px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 28px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px 18px;
+            border-radius: 8px;
+            z-index: 10;
         }
     </style>
 </head>
 
 <body>
-    <cast-media-player></cast-media-player>
+    <div id="status">WatcherCast Receiver gestart</div>
+
+    <video id="video" autoplay controls></video>
 
     <script>
         const context = cast.framework.CastReceiverContext.getInstance();
         const playerManager = context.getPlayerManager();
-        playerManager.addEventListener(
-    cast.framework.events.EventType.MEDIA_INFORMATION_CHANGED,
-    event => {
-        console.log("MEDIA INFO:", event);
-    }
-);
 
-playerManager.addEventListener(
-    cast.framework.events.EventType.TRACKS_CHANGED,
-    event => {
-        console.log("TRACKS CHANGED:", event);
-    }
-);
+        const video = document.getElementById("video");
+        const statusBox = document.getElementById("status");
+
+        function setStatus(text) {
+            console.log("WATCHERCAST:", text);
+            statusBox.textContent = text;
+        }
 
         playerManager.setMessageInterceptor(
             cast.framework.messages.MessageType.LOAD,
             requestData => {
                 console.log("WATCHERCAST LOAD:", requestData);
-                return requestData;
+
+                const media = requestData.media;
+                const videoUrl = media && media.contentId;
+                const tracks = media && media.tracks ? media.tracks : [];
+
+                if (!videoUrl) {
+                    setStatus("Geen video URL ontvangen");
+                    return requestData;
+                }
+
+                setStatus("Video laden...");
+
+                video.innerHTML = "";
+                video.src = videoUrl;
+
+                if (tracks.length > 0) {
+                    const firstTextTrack = tracks.find(t => t.type === "TEXT") || tracks[0];
+
+                    if (firstTextTrack && firstTextTrack.trackContentId) {
+                        const track = document.createElement("track");
+
+                        track.kind = "subtitles";
+                        track.label = firstTextTrack.name || "Subtitle";
+                        track.srclang = firstTextTrack.language || "en";
+                        track.src = firstTextTrack.trackContentId;
+                        track.default = true;
+
+                        video.appendChild(track);
+
+                        setStatus("Video + subtitle laden...");
+                    } else {
+                        setStatus("Track aanwezig, maar geen subtitle URL");
+                    }
+                } else {
+                    setStatus("Video laden zonder subtitle");
+                }
+
+                video.load();
+
+                video.play().then(() => {
+                    setStatus("Afspelen gestart");
+                    setTimeout(() => {
+                        statusBox.style.display = "none";
+                    }, 3000);
+                }).catch(error => {
+                    setStatus("Play error: " + error.message);
+                });
+
+                return null;
             }
         );
 
