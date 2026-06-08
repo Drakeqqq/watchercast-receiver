@@ -68,15 +68,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
     </style>
 </head>
 
@@ -85,14 +76,6 @@
 
     <video id="video" autoplay controls></video>
     <div id="subtitleBox"></div>
-
-
-
-
-
-
-
-
 
 
 <script>
@@ -288,49 +271,15 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
 
 
 
+// Hier moest STOP
 
-
-    if (command.action === "stop") {
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-
-    subtitleBox.innerHTML = "";
-    subtitleCues = [];
-
-    statusBox.style.display = "block";
-    setStatus("DRAKE V6 - klaar voor nieuwe video");
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+   
 
 });
 
 
     context.start();
 </script>
-
-
-
-
-
-
-
-
-
-
 
 
 
