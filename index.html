@@ -93,7 +93,25 @@
 
 
 
+#standbyContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
 
+#watcherText {
+    margin-top: 18px;
+
+    color: white;
+
+    font-family: Arial, sans-serif;
+    font-size: 32px;
+    font-weight: bold;
+
+    letter-spacing: 1px;
+
+    opacity: 0.9;
+}
 
 
 
@@ -103,10 +121,20 @@
 
 <body>
     <div id="standbyScreen">
-    <div id="castIcon">◉</div>
+
+    <div id="standbyContent">
+
+        <div id="castIcon">◉</div>
+
+        <div id="watcherText">
+            WatcherCast
+        </div>
+
+    </div>
+
 </div>
 
-<div id="status">DRAKE V14</div>
+<div id="status"></div>
 
 <video id="video" autoplay controls></video>
 <div id="subtitleBox"></div>
@@ -324,7 +352,7 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     standbyScreen.style.display = "flex";
 
     statusBox.style.display = "block";
-    // setStatus("DRAKE V14");
+    setStatus("DRAKE V14");
 }
 
 
