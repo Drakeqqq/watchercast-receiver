@@ -82,7 +82,7 @@
 </head>
 
 <body>
-    <div id="status">WatcherCast V1</div>
+    <div id="status">DRAKE V2</div>
 
     <video id="video" autoplay controls></video>
     <div id="subtitleBox"></div>
@@ -213,9 +213,11 @@
                         .then(text => {
                             subtitleCues = parseSubtitles(text);
 
-                            setStatus(
-                                "OVERLAY SUBS OK\nCues: " + subtitleCues.length
-                            );
+setStatus(
+    "CUES: " + subtitleCues.length +
+    "\nSTART: " + subtitleCues[0].start +
+    "\nEND: " + subtitleCues[0].end
+);
 
                             startSubtitleOverlayRenderer();
                         })
