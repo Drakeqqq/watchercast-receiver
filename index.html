@@ -33,6 +33,51 @@
             border-radius: 8px;
             z-index: 10;
         }
+
+
+
+
+
+#subtitleBox {
+    position: absolute;
+
+    left: 50%;
+    bottom: 80px;
+
+    transform: translateX(-50%);
+
+    color: white;
+    font-size: 42px;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+
+    text-align: center;
+
+    text-shadow:
+        2px 2px 4px black,
+        -2px -2px 4px black,
+        2px -2px 4px black,
+        -2px 2px 4px black;
+
+    max-width: 90%;
+
+    z-index: 9999;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
     </style>
 </head>
 
@@ -40,6 +85,7 @@
     <div id="status">WatcherCast Receiver gestart</div>
 
     <video id="video" autoplay controls></video>
+    <div id="subtitleBox"></div>
 
     <script>
         const context = cast.framework.CastReceiverContext.getInstance();
@@ -47,6 +93,9 @@
 
         const video = document.getElementById("video");
         const statusBox = document.getElementById("status");
+        const subtitleBox = document.getElementById("subtitleBox");
+        subtitleBox.textContent =
+    "WATCHERCAST SUBTITLE TEST";
 
         function setStatus(text) {
             console.log("WATCHERCAST:", text);
