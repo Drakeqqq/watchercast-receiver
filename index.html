@@ -86,7 +86,10 @@
 
                         video.appendChild(track);
 
-                        setStatus("Video + subtitle laden...");
+                        setStatus(
+    "SUB URL:\n" +
+    firstTextTrack.trackContentId
+);
                     } else {
                         setStatus("Track aanwezig, maar geen subtitle URL");
                     }
