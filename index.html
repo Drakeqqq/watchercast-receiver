@@ -32,6 +32,19 @@
     <script>
         const context = cast.framework.CastReceiverContext.getInstance();
         const playerManager = context.getPlayerManager();
+        playerManager.addEventListener(
+    cast.framework.events.EventType.MEDIA_INFORMATION_CHANGED,
+    event => {
+        console.log("MEDIA INFO:", event);
+    }
+);
+
+playerManager.addEventListener(
+    cast.framework.events.EventType.TRACKS_CHANGED,
+    event => {
+        console.log("TRACKS CHANGED:", event);
+    }
+);
 
         playerManager.setMessageInterceptor(
             cast.framework.messages.MessageType.LOAD,
