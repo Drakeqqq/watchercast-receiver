@@ -174,10 +174,20 @@
     let subtitleCues = [];
 
     // Zet status op het TV-scherm + in de Chromecast console.
-    function setStatus(text) {
+function setStatus(text, timeoutMs = 2000) {
+
     console.log("WATCHERCAST:", text);
+
     statusBox.textContent = text;
     statusBox.style.display = "block";
+
+    clearTimeout(window.statusTimer);
+
+    if (timeoutMs > 0) {
+        window.statusTimer = setTimeout(() => {
+            statusBox.style.display = "none";
+        }, timeoutMs);
+    }
 }
 
     // Zet VTT/SRT tijdcode om naar seconden.
