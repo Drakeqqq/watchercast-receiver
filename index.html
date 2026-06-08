@@ -81,7 +81,7 @@
 </head>
 
 <body>
-    <div id="status">DRAKE V9</div>
+    <div id="status">DRAKE V10</div>
 
     <video id="video" autoplay controls></video>
     <div id="subtitleBox"></div>
@@ -285,11 +285,37 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
         setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
     }
 
+
+
+
+
+
     if (command.action === "stop") {
-        video.pause();
-        video.currentTime = 0;
-        setStatus("STOP");
-    }
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+
+    subtitleBox.innerHTML = "";
+    subtitleCues = [];
+
+    statusBox.style.display = "block";
+    setStatus("DRAKE V6 - klaar voor nieuwe video");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 });
 
 
