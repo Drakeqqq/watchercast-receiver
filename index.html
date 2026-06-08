@@ -339,6 +339,13 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
         return;
     }
 
+    if (command.action === "ping") {
+    console.log("WATCHERCAST HEARTBEAT PING");
+    return;
+    }
+
+
+
     if (command.action === "pause") {
         video.pause();
         setStatus("PAUSE");
