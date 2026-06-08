@@ -82,7 +82,7 @@
 </head>
 
 <body>
-    <div id="status">DRAKE V2</div>
+    <div id="status">DRAKE V3</div>
 
     <video id="video" autoplay controls></video>
     <div id="subtitleBox"></div>
@@ -155,8 +155,8 @@
 
             if (timeParts.length !== 2) continue;
 
-            const start = timeToSeconds(timeParts[0]);
-            const end = timeToSeconds(timeParts[1].split(" ")[0]);
+            const start = timeToSeconds(timeParts[0].trim());
+            const end = timeToSeconds(timeParts[1].trim().split(/\s+/)[0]);
 
             const textLines = lines.slice(timeLineIndex + 1);
             const cueText = textLines.join("<br>");
