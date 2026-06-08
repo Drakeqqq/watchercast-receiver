@@ -100,7 +100,10 @@
                 video.load();
 
                 video.play().then(() => {
-                    setStatus("Afspelen gestart");
+                    setStatus(
+    "VIDEO OK\n" +
+    "Tracks: " + tracks.length
+);
                     setTimeout(() => {
                         statusBox.style.display = "none";
                     }, 3000);
