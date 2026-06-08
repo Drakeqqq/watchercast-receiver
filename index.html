@@ -32,7 +32,7 @@
             background: rgba(0, 0, 0, 0.6);
             padding: 12px 18px;
             border-radius: 8px;
-            z-index: 10;
+            z-index: 1000;
         }
 
 
@@ -134,7 +134,7 @@
 
 </div>
 
-<div id="status">DRAKE V14</div>
+<div id="status">Version 1</div>
 
 <video id="video" autoplay controls></video>
 <div id="subtitleBox"></div>
@@ -352,7 +352,6 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     standbyScreen.style.display = "flex";
 
     statusBox.style.display = "block";
-    setStatus("DRAKE V14");
 }
 
 
