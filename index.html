@@ -140,7 +140,7 @@
 </head>
 
 <body>
-    <div id="versionTag">Version 10</div>
+    <div id="versionTag">Version 11</div>
     <div id="standbyScreen">
 
     <div id="standbyContent">
@@ -155,7 +155,7 @@
 
 </div>
 
-<div id="status">Version 10</div>
+<div id="status">Version 11</div>
 
 <video id="video" autoplay controls></video>
 <div id="subtitleBox"></div>
@@ -273,21 +273,13 @@ function setStatus(text, timeoutMs = 2000) {
 
             if (!videoUrl) {
                 setStatus("Geen video URL ontvangen");
-                requestData.media.contentId = "https://example.com/does-not-exist.mp4";
-                requestData.media.tracks = [];
-                requestData.activeTrackIds = [];
 
-                // return requestData;
-                const data123 = {
-                    media: {
-                        contentId: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-                        contentType: "video/mp4",
-                        streamType: "BUFFERED"
-                    },
-                    autoplay: true
-                };
 
-                return data123;
+
+
+
+                // Deze return requestData laten staan dus.
+                return requestData;
             }
 
             setStatus("Video laden...");
@@ -335,8 +327,18 @@ setStatus(
                 setStatus("Play error:\n" + error.message);
             });
 
-            return requestData;
-        }
+            // return requestData;
+            const data123 = {
+                media: {
+                    contentId: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+                    contentType: "video/mp4",
+                    streamType: "BUFFERED"
+                },
+                autoplay: true
+            };
+
+            return data123;
+                    }
     );
 
 
