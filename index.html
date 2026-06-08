@@ -32,8 +32,28 @@
             background: rgba(0, 0, 0, 0.6);
             padding: 12px 18px;
             border-radius: 8px;
-            z-index: 99999;
+            z-index: 10;
         }
+
+
+        #versionTag {
+    position: absolute;
+    left: 20px;
+    top: 20px;
+
+    color: #888;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+
+    z-index: 99999;
+}
+
+
+
+
+
+
+
 
 
 
@@ -120,6 +140,7 @@
 </head>
 
 <body>
+    <div id="versionTag">Version 2</div>
     <div id="standbyScreen">
 
     <div id="standbyContent">
@@ -154,9 +175,10 @@
 
     // Zet status op het TV-scherm + in de Chromecast console.
     function setStatus(text) {
-        console.log("WATCHERCAST:", text);
-        statusBox.textContent = text;
-    }
+    console.log("WATCHERCAST:", text);
+    statusBox.textContent = text;
+    statusBox.style.display = "block";
+}
 
     // Zet VTT/SRT tijdcode om naar seconden.
     function timeToSeconds(time) {
@@ -351,7 +373,7 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     video.style.display = "none";
     standbyScreen.style.display = "flex";
 
-    statusBox.style.display = "block";
+    statusBox.style.display = "none";
 }
 
 
