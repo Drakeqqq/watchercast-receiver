@@ -260,7 +260,7 @@ function setStatus(text, timeoutMs = 2000) {
             if (!video || !subtitleBox || subtitleCues.length === 0) return;
 
             const now =
-            video.currentTime +
+            video.currentTime -
             (subtitleOffsetMs / 1000);
 
             const activeCue = subtitleCues.find(cue =>
