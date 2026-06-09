@@ -146,7 +146,7 @@
 </head>
 
 <body>
-    <div id="versionTag">Version 15</div>
+    <div id="versionTag">Version 16</div>
     <div id="standbyScreen">
 
     <div id="standbyContent">
@@ -161,7 +161,7 @@
 
 </div>
 
-<div id="status">Version 15</div>
+<div id="status">Version 16</div>
 
 <video id="video" autoplay controls></video>
 <div id="subtitleBox"></div>
@@ -179,6 +179,7 @@
 
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
+    let subtitlesVisible = true;
 
     // Zet status op het TV-scherm + in de Chromecast console.
 function setStatus(text, timeoutMs = 2000) {
@@ -258,6 +259,10 @@ function setStatus(text, timeoutMs = 2000) {
     function startSubtitleOverlayRenderer() {
         setInterval(() => {
             if (!video || !subtitleBox || subtitleCues.length === 0) return;
+            if (!subtitlesVisible) {
+            subtitleBox.innerHTML = "";
+            return;
+        }
 
             const now =
             video.currentTime -
@@ -389,7 +394,21 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     }
 
 
+if (command.action === "subtitleVisibility") {
 
+    subtitlesVisible =
+        command.visible === true;
+
+    if (!subtitlesVisible) {
+        subtitleBox.innerHTML = "";
+    }
+
+    setStatus(
+        subtitlesVisible
+            ? "Subtitles ON"
+            : "Subtitles OFF"
+    );
+}
 
 if (command.action === "subtitleOffset") {
 
