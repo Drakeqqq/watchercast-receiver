@@ -146,7 +146,7 @@
 </head>
 
 <body>
-    <div id="versionTag">Version 14</div>
+    <div id="versionTag">Version 15</div>
     <div id="standbyScreen">
 
     <div id="standbyContent">
@@ -161,7 +161,7 @@
 
 </div>
 
-<div id="status">Version 14</div>
+<div id="status">Version 15</div>
 
 <video id="video" autoplay controls></video>
 <div id="subtitleBox"></div>
@@ -178,6 +178,7 @@
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
 
     let subtitleCues = [];
+    let subtitleOffsetMs = 0;
 
     // Zet status op het TV-scherm + in de Chromecast console.
 function setStatus(text, timeoutMs = 2000) {
@@ -258,7 +259,9 @@ function setStatus(text, timeoutMs = 2000) {
         setInterval(() => {
             if (!video || !subtitleBox || subtitleCues.length === 0) return;
 
-            const now = video.currentTime;
+            const now =
+            video.currentTime +
+            (subtitleOffsetMs / 1000);
 
             const activeCue = subtitleCues.find(cue =>
                 now >= cue.start && now <= cue.end
@@ -388,6 +391,17 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
 
 
 
+if (command.action === "subtitleOffset") {
+
+    subtitleOffsetMs =
+        Number(command.offset || 0);
+
+    setStatus(
+        "Subtitle offset: " +
+        subtitleOffsetMs +
+        " ms"
+    );
+}
 
    if (command.action === "stop") {
     video.pause();
