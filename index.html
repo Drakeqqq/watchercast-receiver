@@ -23,34 +23,24 @@
         }
 
 
-
-        #status {
-            position: absolute;
-            left: 30px;
-            top: 30px;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 28px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 12px 18px;
-            border-radius: 8px;
-            z-index: 10;
-        }
+        
 
 
-        #versionTag {
+#status {
     position: absolute;
-    left: 20px;
-    top: 20px;
-
-    color: #888;
+    left: 30px;
+    top: 30px;
+    color: white;
     font-family: Arial, sans-serif;
-    font-size: 16px;
-
-    z-index: 99999;
+    font-size: 28px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 12px 18px;
+    border-radius: 8px;
+    z-index: 10;
+    display: none;
 }
 
-
+        
 
 
 
@@ -142,7 +132,8 @@
 </head>
 
 <body>
-    <div id="versionTag">Version 16</div>
+
+
     <div id="standbyScreen">
 
     <div id="standbyContent">
@@ -157,8 +148,8 @@
 
 </div>
 
-<div id="status">Version 16</div>
 
+<div id="status"></div>
 <video id="video" autoplay controls></video>
 <div id="subtitleBox"></div>
 
@@ -172,54 +163,13 @@
     const subtitleBox = document.getElementById("subtitleBox");
     const standbyScreen = document.getElementById("standbyScreen");
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
-    video.addEventListener("loadstart", () => {
-    setStatus("VIDEO EVENT: loadstart", 0);
-});
-
-video.addEventListener("loadedmetadata", () => {
-    setStatus(
-        "VIDEO EVENT: loadedmetadata\n" +
-        "Duration: " + video.duration,
-        0
-    );
-});
-
-video.addEventListener("canplay", () => {
-    setStatus("VIDEO EVENT: canplay", 0);
-});
-
-video.addEventListener("playing", () => {
-    setStatus("VIDEO EVENT: playing", 3000);
-});
-
-video.addEventListener("waiting", () => {
-    setStatus("VIDEO EVENT: waiting/buffering", 0);
-});
-
-video.addEventListener("stalled", () => {
-    setStatus("VIDEO EVENT: stalled", 0);
-});
-
-video.addEventListener("error", () => {
-    const err = video.error;
-
-    setStatus(
-        "VIDEO ERROR\n" +
-        "Code: " + (err ? err.code : "none") + "\n" +
-        "Message: " + (err ? err.message : "none"),
-        0
-    );
-});
 
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
     let subtitlesVisible = true;
 
-    // Zet status op het TV-scherm + in de Chromecast console.
-function setStatus(text, timeoutMs = 2000) {
-
-    console.log("WATCHERCAST:", text);
-
+    
+    function setStatus(text, timeoutMs = 2000) {
     statusBox.textContent = text;
     statusBox.style.display = "block";
 
@@ -231,7 +181,6 @@ function setStatus(text, timeoutMs = 2000) {
         }, timeoutMs);
     }
 }
-
     // Zet VTT/SRT tijdcode om naar seconden.
     function timeToSeconds(time) {
         const clean = time.trim().replace(",", ".");
@@ -313,14 +262,14 @@ function setStatus(text, timeoutMs = 2000) {
     playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.LOAD,
         requestData => {
-            console.log("WATCHERCAST LOAD:", requestData);
+
 
             const media = requestData.media;
             const videoUrl = media && media.contentId;
             const tracks = media && media.tracks ? media.tracks : [];
 
             if (!videoUrl) {
-                setStatus("Geen video URL ontvangen");
+                // setStatus("Geen video URL ontvangen");
 
 
 
@@ -330,7 +279,7 @@ function setStatus(text, timeoutMs = 2000) {
                 return requestData;
             }
 
-            setStatus("Video laden...");
+            // setStatus("Video laden...");
             standbyScreen.style.display = "none";
             video.style.display = "block";
             video.src = videoUrl;
@@ -340,39 +289,35 @@ function setStatus(text, timeoutMs = 2000) {
                 const subtitleUrl = firstTextTrack.trackContentId;
 
                 if (subtitleUrl) {
-                    setStatus("Subtitle downloaden...");
+                    // setStatus("Subtitle downloaden...");
 
                     fetch(subtitleUrl)
                         .then(response => response.text())
                         .then(text => {
                             subtitleCues = parseSubtitles(text);
 
-setStatus(
-    "CUES: " + subtitleCues.length +
-    "\nSTART: " + subtitleCues[0].start +
-    "\nEND: " + subtitleCues[0].end
-);
+
 
                             startSubtitleOverlayRenderer();
                         })
                         .catch(error => {
-                            setStatus("Subtitle fetch error:\n" + error.message);
+                            // setStatus("Subtitle fetch error:\n" + error.message);
                         });
                 }
             } else {
-                setStatus("Video zonder subtitle");
+                // setStatus("Video zonder subtitle");
             }
 
             video.load();
 
             video.play().then(() => {
-                setStatus("VIDEO OK");
+                // setStatus("VIDEO OK");
 
                 setTimeout(() => {
                     statusBox.style.display = "none";
                 }, 3000);
             }).catch(error => {
-                setStatus("Play error:\n" + error.message);
+                // setStatus("Play error:\n" + error.message);
             });
 
             return requestData;
@@ -388,14 +333,14 @@ setStatus(
 context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     const command = event.data;
 
-    console.log("WATCHERCAST CONTROL:", command);
+
 
     if (!command || !command.action) {
         return;
     }
 
     if (command.action === "ping") {
-    console.log("WATCHERCAST HEARTBEAT PING");
+
     return;
     }
 
