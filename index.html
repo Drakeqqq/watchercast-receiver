@@ -168,6 +168,14 @@
     let subtitleOffsetMs = 0;
     let subtitlesVisible = true;
 
+    let ratioIndex = 0;
+
+    const ratioModes = [
+    { name: "Fit", fit: "contain" },
+    { name: "Fill", fit: "fill" },
+    { name: "Cover", fit: "cover" }
+    ];
+
     
     function setStatus(text, timeoutMs = 2000) {
     statusBox.textContent = text;
@@ -364,6 +372,17 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
             video.pause();
             setStatus("PAUSE");
         }
+    }
+
+
+    if (command.action === "changeRatio") {
+    ratioIndex = (ratioIndex + 1) % ratioModes.length;
+
+    const mode = ratioModes[ratioIndex];
+
+    video.style.objectFit = mode.fit;
+
+    setStatus("Ratio: " + mode.name);
     }
 
     if (command.action === "seekBy") {
