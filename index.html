@@ -171,12 +171,61 @@
     let ratioIndex = 0;
 
     const ratioModes = [
-    { name: "Fit", fit: "contain" },
-    { name: "Fill", fit: "fill" },
-    { name: "Cover", fit: "cover" }
+    { name: "Passend op scherm", mode: "fit" },
+    { name: "Schermvullend", mode: "fill" },
+    { name: "16:9", mode: "16x9" },
+    { name: "4:3", mode: "4x3" },
+    { name: "Centreren", mode: "center" },
+    { name: "Best passend", mode: "bestfit" }
     ];
 
     
+    function applyRatioMode(mode) {
+    video.style.position = "absolute";
+    video.style.left = "50%";
+    video.style.top = "50%";
+    video.style.transform = "translate(-50%, -50%)";
+    video.style.background = "black";
+
+    if (mode === "fit") {
+        video.style.width = "100%";
+        video.style.height = "100%";
+        video.style.objectFit = "contain";
+    }
+
+    if (mode === "fill") {
+        video.style.width = "100%";
+        video.style.height = "100%";
+        video.style.objectFit = "fill";
+    }
+
+    if (mode === "16x9") {
+        video.style.width = "100%";
+        video.style.height = "100%";
+        video.style.objectFit = "fill";
+    }
+
+    if (mode === "4x3") {
+        video.style.width = "133.33vh";
+        video.style.height = "100vh";
+        video.style.objectFit = "fill";
+    }
+
+    if (mode === "center") {
+        video.style.width = "auto";
+        video.style.height = "auto";
+        video.style.maxWidth = "100%";
+        video.style.maxHeight = "100%";
+        video.style.objectFit = "none";
+    }
+
+    if (mode === "bestfit") {
+        video.style.width = "100%";
+        video.style.height = "100%";
+        video.style.objectFit = "contain";
+    }
+}
+
     function setStatus(text, timeoutMs = 2000) {
     statusBox.textContent = text;
     statusBox.style.display = "block";
@@ -291,6 +340,7 @@
             standbyScreen.style.display = "none";
             video.style.display = "block";
             video.src = videoUrl;
+            applyRatioMode(ratioModes[ratioIndex].mode);
 
             if (tracks.length > 0) {
                 const firstTextTrack = tracks.find(t => t.type === "TEXT") || tracks[0];
@@ -378,11 +428,11 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     if (command.action === "changeRatio") {
     ratioIndex = (ratioIndex + 1) % ratioModes.length;
 
-    const mode = ratioModes[ratioIndex];
+    const ratio = ratioModes[ratioIndex];
 
-    video.style.objectFit = mode.fit;
+    applyRatioMode(ratio.mode);
 
-    setStatus("Ratio: " + mode.name);
+    setStatus("Ratio: " + ratio.name);
     }
 
     if (command.action === "seekBy") {
