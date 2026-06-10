@@ -172,6 +172,44 @@
     const subtitleBox = document.getElementById("subtitleBox");
     const standbyScreen = document.getElementById("standbyScreen");
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
+    video.addEventListener("loadstart", () => {
+    setStatus("VIDEO EVENT: loadstart", 0);
+});
+
+video.addEventListener("loadedmetadata", () => {
+    setStatus(
+        "VIDEO EVENT: loadedmetadata\n" +
+        "Duration: " + video.duration,
+        0
+    );
+});
+
+video.addEventListener("canplay", () => {
+    setStatus("VIDEO EVENT: canplay", 0);
+});
+
+video.addEventListener("playing", () => {
+    setStatus("VIDEO EVENT: playing", 3000);
+});
+
+video.addEventListener("waiting", () => {
+    setStatus("VIDEO EVENT: waiting/buffering", 0);
+});
+
+video.addEventListener("stalled", () => {
+    setStatus("VIDEO EVENT: stalled", 0);
+});
+
+video.addEventListener("error", () => {
+    const err = video.error;
+
+    setStatus(
+        "VIDEO ERROR\n" +
+        "Code: " + (err ? err.code : "none") + "\n" +
+        "Message: " + (err ? err.message : "none"),
+        0
+    );
+});
 
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
