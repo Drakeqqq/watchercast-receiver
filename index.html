@@ -459,7 +459,7 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     }
 
 if (command.action === "loadingCountdown") {
-    let seconds = Number(command.seconds || 30);
+    let seconds = Number(command.seconds || 15);
 
     standbyScreen.style.display = "flex";
     video.style.display = "none";
