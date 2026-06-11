@@ -163,6 +163,7 @@
     const subtitleBox = document.getElementById("subtitleBox");
     const standbyScreen = document.getElementById("standbyScreen");
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
+    let androidSenderId = null;
 
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
@@ -224,6 +225,21 @@
         video.style.height = "100%";
         video.style.objectFit = "contain";
     }
+}
+
+
+
+
+function notifyAndroid(messageObject) {
+    if (!androidSenderId) {
+        return;
+    }
+
+    context.sendCustomMessage(
+        CONTROL_NAMESPACE,
+        androidSenderId,
+        JSON.stringify(messageObject)
+    );
 }
 
     function setStatus(text, timeoutMs = 2000) {
@@ -294,6 +310,25 @@
 
         return cues;
     }
+
+
+
+
+
+
+video.addEventListener("error", () => {
+    const err = video.error;
+
+    notifyAndroid({
+        action: "videoError",
+        code: err ? err.code : 0,
+        message: err ? err.message : "Unknown video error"
+    });
+
+    setStatus("VIDEO ERROR: " + (err ? err.code : "unknown"), 5000);
+});
+
+
 
     // Toont elke 100ms de juiste ondertitel op basis van video.currentTime.
     function startSubtitleOverlayRenderer() {
@@ -390,6 +425,8 @@
 
 
 context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
+    androidSenderId = event.senderId;
+
     const command = event.data;
 
 
