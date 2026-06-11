@@ -125,7 +125,14 @@
     opacity: 0.9;
 }
 
-
+#loadingText {
+    margin-top: 14px;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 24px;
+    font-weight: bold;
+    opacity: 0.85;
+}
 
 
     </style>
@@ -143,6 +150,7 @@
         <div id="watcherText">
             WatcherCast
         </div>
+        <div id="loadingText"></div>
 
     </div>
 
@@ -162,6 +170,8 @@
     const statusBox = document.getElementById("status");
     const subtitleBox = document.getElementById("subtitleBox");
     const standbyScreen = document.getElementById("standbyScreen");
+    const loadingText = document.getElementById("loadingText");
+    let loadingTimer = null;
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
     let androidSenderId = null;
 
@@ -371,6 +381,14 @@ video.addEventListener("error", () => {
                 return requestData;
             }
 
+
+
+
+clearInterval(loadingTimer);
+loadingText.textContent = "";
+
+
+
             // setStatus("Video laden...");
             standbyScreen.style.display = "none";
             video.style.display = "block";
@@ -440,7 +458,30 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     return;
     }
 
+if (command.action === "loadingCountdown") {
+    let seconds = Number(command.seconds || 30);
 
+    standbyScreen.style.display = "flex";
+    video.style.display = "none";
+
+    clearInterval(loadingTimer);
+
+    loadingText.textContent = "Video laden... " + seconds;
+
+    loadingTimer = setInterval(() => {
+        seconds--;
+
+        if (seconds <= 0) {
+            clearInterval(loadingTimer);
+            loadingText.textContent = "Video laden...";
+            return;
+        }
+
+        loadingText.textContent = "Video laden... " + seconds;
+    }, 1000);
+
+    return;
+}
 
     if (command.action === "pause") {
         video.pause();
