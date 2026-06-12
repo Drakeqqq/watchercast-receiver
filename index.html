@@ -252,6 +252,26 @@ function notifyAndroid(messageObject) {
     );
 }
 
+
+
+
+
+
+
+setInterval(() => {
+
+    notifyAndroid({
+        action: "position",
+        positionMs: Math.floor(video.currentTime * 1000)
+    });
+
+}, 1000);
+
+
+
+
+
+
     function setStatus(text, timeoutMs = 2000) {
     statusBox.textContent = text;
     statusBox.style.display = "block";
