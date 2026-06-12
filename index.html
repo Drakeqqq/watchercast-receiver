@@ -473,6 +473,11 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
         return;
     }
 
+    if (command.action === "register") {
+    setStatus("ANDROID REGISTERED", 5000);
+    return;
+}
+
     if (command.action === "ping") {
 
     return;
