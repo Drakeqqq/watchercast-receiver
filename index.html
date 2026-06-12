@@ -465,7 +465,15 @@ loadingText.textContent = "";
 context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     androidSenderId = event.senderId;
 
-    const command = event.data;
+    let command = event.data;
+
+if (typeof command === "string") {
+    try {
+        command = JSON.parse(command);
+    } catch (e) {
+        return;
+    }
+}
 
 
 
