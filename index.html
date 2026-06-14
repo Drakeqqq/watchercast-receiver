@@ -370,14 +370,32 @@
             video.load();
 
             video.play().then(() => {
-                // setStatus("VIDEO OK");
+    setStatus("VIDEO OK", 3000);
+}).catch(error => {
+    setStatus("Play error:\n" + error.message, 0);
+});
 
-                setTimeout(() => {
-                    statusBox.style.display = "none";
-                }, 3000);
-            }).catch(error => {
-                // setStatus("Play error:\n" + error.message);
-            });
+
+
+video.onerror = function () {
+    let errorText = "Unknown video error";
+
+    if (video.error) {
+        errorText =
+            "VIDEO ERROR\n" +
+            "Code: " + video.error.code + "\n" +
+            "Message: " + (video.error.message || "Geen message");
+    }
+
+    setStatus(errorText, 0);
+};
+
+
+
+
+
+
+
 
             return requestData;
 
