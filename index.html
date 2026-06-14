@@ -338,12 +338,15 @@
 
             // setStatus("Video laden...");
             standbyScreen.style.display = "none";
-            video.style.display = "block";
-            video.src = videoUrl;
-video.type = "video/x-matroska";
 
-applyRatioMode(ratioModes[ratioIndex].mode);
-setStatus("Type test: video/x-matroska", 0);
+// TEST: laat CAF/Chromecast zelf laden.
+// Dus wij zetten video.src NIET handmatig.
+setStatus("CAF native load test", 0);
+
+// video.style.display = "block";
+// video.src = videoUrl;
+// video.type = "video/x-matroska";
+// applyRatioMode(ratioModes[ratioIndex].mode);
 
             if (tracks.length > 0) {
                 const firstTextTrack = tracks.find(t => t.type === "TEXT") || tracks[0];
@@ -369,13 +372,13 @@ setStatus("Type test: video/x-matroska", 0);
                 // setStatus("Video zonder subtitle");
             }
 
-            video.load();
-
-            video.play().then(() => {
-    setStatus("VIDEO OK", 3000);
-}).catch(error => {
-    setStatus("Play error:\n" + error.message, 0);
-});
+            // TEST: CAF moet zelf load/play doen.
+// video.load();
+// video.play().then(() => {
+//     setStatus("VIDEO OK", 3000);
+// }).catch(error => {
+//     setStatus("Play error:\n" + error.message, 0);
+// });
 
 
 
