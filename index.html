@@ -378,13 +378,18 @@
 
 
 video.onerror = function () {
-    let errorText = "Unknown video error";
+    let errorText = "Video kan niet worden afgespeeld.";
 
-    if (video.error) {
+    if (video.error && video.error.code === 4) {
         errorText =
-            "VIDEO ERROR\n" +
+            "Video niet compatibel\n\n" +
+            "Deze video bevat waarschijnlijk meer dan 2 audiokanalen.\n" +
+            "Converteer de audio eerst naar stereo en probeer opnieuw.";
+    } else if (video.error) {
+        errorText =
+            "Video fout\n\n" +
             "Code: " + video.error.code + "\n" +
-            "Message: " + (video.error.message || "Geen message");
+            "Message: " + (video.error.message || "Geen extra informatie");
     }
 
     setStatus(errorText, 0);
