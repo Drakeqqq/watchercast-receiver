@@ -370,9 +370,10 @@
             video.load();
 
             video.play().then(() => {
-    setStatus("VIDEO OK", 3000);
+    // Playback gestart. Geen melding nodig.
 }).catch(error => {
-    setStatus("Play error:\n" + error.message, 0);
+    // Deze play-interrupt is meestal onschuldig.
+    // Niet tonen op tv.
 });
 
 
