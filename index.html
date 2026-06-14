@@ -340,8 +340,10 @@
             standbyScreen.style.display = "none";
             video.style.display = "block";
             video.src = videoUrl;
-            applyRatioMode(ratioModes[ratioIndex].mode);
-            setStatus("Ratio: " + ratioModes[ratioIndex].name);
+video.type = "video/x-matroska";
+
+applyRatioMode(ratioModes[ratioIndex].mode);
+setStatus("Type test: video/x-matroska", 0);
 
             if (tracks.length > 0) {
                 const firstTextTrack = tracks.find(t => t.type === "TEXT") || tracks[0];
@@ -528,4 +530,4 @@ if (command.action === "subtitleOffset") {
 
 
 
-<!-- VERSION 2 -->
+<!-- VERSION 5 -->
