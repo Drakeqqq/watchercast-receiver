@@ -423,6 +423,18 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
 
 
 
+
+if (command.action === "showStatus") {
+    setStatus(command.text || "", 3000);
+}
+
+
+
+
+
+
+
+
     if (command.action === "pause") {
         video.pause();
         setStatus("PAUSE");
