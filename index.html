@@ -383,9 +383,9 @@ video.onerror = function () {
 
     if (video.error && video.error.code === 4) {
         errorText =
-            "Video niet compatibel in zijn huidige staat(meer dan 2 audiokanalen in het videobestand) -> converteer de video eerst naar stereo en probeer het opnieuw.";
+            "Video niet compatibel in zijn huidige staat(meer dan 2 audiokanalen in het videobestand): Converteer de video eerst naar stereo en probeer het opnieuw.";
 
-            
+
     } else if (video.error) {
         errorText =
             "Video fout\n\n" +
