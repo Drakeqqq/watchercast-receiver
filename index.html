@@ -455,15 +455,10 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     }
 
     if (command.action === "seekBy") {
-    const offset = Number(command.offset || 0);
-
-    setStatus(
-        "SEEK RECEIVED\n" +
-        "Current: " + Math.round(video.currentTime) +
-        "\nOffset: " + offset,
-        5000
-    );
-}
+        const offset = Number(command.offset || 0);
+        video.currentTime = Math.max(0, video.currentTime + offset);
+        setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+    }
 
 
 if (command.action === "subtitleVisibility") {
