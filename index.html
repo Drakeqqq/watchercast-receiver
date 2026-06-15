@@ -343,44 +343,59 @@
             applyRatioMode(ratioModes[ratioIndex].mode);
             setStatus("Ratio: " + ratioModes[ratioIndex].name);
 
-            if (tracks.length > 0) {
-                const firstTextTrack = tracks.find(t => t.type === "TEXT") || tracks[0];
-                const subtitleUrl = firstTextTrack.trackContentId;
 
-                if (subtitleUrl) {
-                    // setStatus("Subtitle downloaden...");
 
-                    fetch(subtitleUrl)
-                        .then(response => response.text())
-                        .then(text => {
-    subtitleCues = parseSubtitles(text);
 
-    if (subtitleCues.length > 0) {
-    setStatus(
-        "Subtitle OK (" +
-        subtitleCues.length +
-        " cues)",
-        5000
-    );
-} else {
-    setStatus(
-        "Subtitle FAILED",
-        5000
-    );
+
+if (tracks.length > 0) {
+
+    const subtitleUrls = tracks
+        .filter(t => t.type === "TEXT")
+        .map(t => t.trackContentId);
+
+    const trySubtitle = (index) => {
+
+        if (index >= subtitleUrls.length) {
+            setStatus("Subtitle FAILED", 5000);
+            return;
+        }
+
+        fetch(subtitleUrls[index])
+            .then(response => response.text())
+            .then(text => {
+
+                const cues = parseSubtitles(text);
+
+                if (cues.length > 0) {
+
+                    subtitleCues = cues;
+
+                    setStatus(
+                        "Subtitle OK (" +
+                        cues.length +
+                        " cues)",
+                        5000
+                    );
+
+                    startSubtitleOverlayRenderer();
+
+                } else {
+
+                    trySubtitle(index + 1);
+                }
+            })
+            .catch(error => {
+
+                trySubtitle(index + 1);
+            });
+    };
+
+    trySubtitle(0);
 }
 
-    startSubtitleOverlayRenderer();
-})
-                        .catch(error => {
-    setStatus(
-        "Subtitle load FAILED",
-        5000
-    );
-});
-                }
-            } else {
-                // setStatus("Video zonder subtitle");
-            }
+
+
+
 
             video.load();
 
@@ -413,18 +428,10 @@ video.onerror = function () {
 
 
 
-
-
-
-
-
             return requestData;
 
                     }
     );
-
-
-
 
 
 
