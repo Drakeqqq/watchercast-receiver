@@ -355,12 +355,19 @@
                         .then(text => {
     subtitleCues = parseSubtitles(text);
 
+    if (subtitleCues.length > 0) {
     setStatus(
         "Subtitle loaded: " +
         subtitleCues.length +
         " cues",
         5000
     );
+} else {
+    setStatus(
+        "Subtitle load FAILED: 0 cues",
+        5000
+    );
+}
 
     startSubtitleOverlayRenderer();
 })
