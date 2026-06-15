@@ -353,15 +353,23 @@
                     fetch(subtitleUrl)
                         .then(response => response.text())
                         .then(text => {
-                            subtitleCues = parseSubtitles(text);
+    subtitleCues = parseSubtitles(text);
 
+    setStatus(
+        "Subtitle loaded: " +
+        subtitleCues.length +
+        " cues",
+        5000
+    );
 
-
-                            startSubtitleOverlayRenderer();
-                        })
+    startSubtitleOverlayRenderer();
+})
                         .catch(error => {
-                            // setStatus("Subtitle fetch error:\n" + error.message);
-                        });
+    setStatus(
+        "Subtitle load FAILED",
+        5000
+    );
+});
                 }
             } else {
                 // setStatus("Video zonder subtitle");
