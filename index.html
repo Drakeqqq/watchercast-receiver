@@ -167,6 +167,8 @@
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
     let subtitlesVisible = true;
+    const PAUSE_KEEPALIVE_INTERVAL_MS = 15 * 60 * 1000;
+    const PAUSE_KEEPALIVE_PLAY_MS = 250;
 
     let ratioIndex = 2;
 
@@ -538,7 +540,25 @@ if (command.action === "subtitleOffset") {
 
 });
 
-
+setInterval(() => {
+    if (
+        video &&
+        video.src &&
+        video.paused &&
+        !video.ended &&
+        standbyScreen.style.display !== "flex"
+    ) {
+        video.play().then(() => {
+            setTimeout(() => {
+                if (video && !video.ended) {
+                    video.pause();
+                }
+            }, PAUSE_KEEPALIVE_PLAY_MS);
+        }).catch(error => {
+            // Stil falen. Geen melding nodig.
+        });
+    }
+}, PAUSE_KEEPALIVE_INTERVAL_MS);
     context.start();
 </script>
 
