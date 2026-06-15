@@ -356,7 +356,7 @@ if (tracks.length > 0) {
     const trySubtitle = (index) => {
 
         if (index >= subtitleUrls.length) {
-            setStatus("Subtitle FAILED", 5000);
+            // Geen bruikbare subtitle gevonden. Geen melding nodig.
             return;
         }
 
@@ -370,12 +370,7 @@ if (tracks.length > 0) {
 
                     subtitleCues = cues;
 
-                    setStatus(
-                        "Subtitle OK (" +
-                        cues.length +
-                        " cues)",
-                        5000
-                    );
+                    // Subtitle succesvol geladen. Geen melding nodig.
 
                     startSubtitleOverlayRenderer();
 
