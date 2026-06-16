@@ -404,7 +404,22 @@ if (tracks.length > 0) {
 });
 
 
+video.onended = function () {
+    video.pause();
 
+    video.currentTime = 0;
+    video.removeAttribute("src");
+    video.src = "";
+    video.load();
+
+    subtitleBox.innerHTML = "";
+    subtitleCues = [];
+
+    video.style.display = "none";
+    standbyScreen.style.display = "flex";
+
+    statusBox.style.display = "none";
+};
 video.onerror = function () {
     let errorText = "Video kan niet worden afgespeeld.";
 
@@ -484,6 +499,13 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
         video.currentTime = Math.max(0, video.currentTime + offset);
         setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
     }
+
+
+    if (command.action === "seekTo") {
+    const position = Number(command.position || 0);
+    video.currentTime = Math.max(0, position);
+    setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+}
 
 
 if (command.action === "subtitleVisibility") {
