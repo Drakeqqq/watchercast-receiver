@@ -517,11 +517,13 @@ if (command.action === "subtitleVisibility") {
         subtitleBox.innerHTML = "";
     }
 
+    if (command.silent !== true) {
     setStatus(
         subtitlesVisible
             ? "Subtitles ON"
             : "Subtitles OFF"
     );
+}
 }
 
 if (command.action === "subtitleOffset") {
@@ -529,11 +531,13 @@ if (command.action === "subtitleOffset") {
     subtitleOffsetMs =
         Number(command.offset || 0);
 
+    if (command.silent !== true) {
     setStatus(
         "Subtitle offset: " +
         subtitleOffsetMs +
         " ms"
     );
+}
 }
 
    if (command.action === "stop") {
@@ -593,4 +597,4 @@ setInterval(() => {
 
 
 
-<!-- VERSION 2 -->
+<!-- VERSION 123 -->
