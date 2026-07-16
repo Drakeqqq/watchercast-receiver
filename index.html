@@ -163,6 +163,150 @@
     const subtitleBox = document.getElementById("subtitleBox");
     const standbyScreen = document.getElementById("standbyScreen");
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
+    const DEBUG_TELEMETRY_INTERVAL_MS = 5000;
+
+    const knownSenderIds = new Set();
+    let receiverStartedAtMs = Date.now();
+    let receiverEventSequence = 0;
+    let lastVideoEvent = "receiver_created";
+    let lastCommandAction = null;
+    let lastCommandId = null;
+
+    function safeError(error) {
+        if (!error) return null;
+
+        return {
+            name: error.name || null,
+            message: error.message || String(error),
+            stack: error.stack || null
+        };
+    }
+
+    function bufferedRanges() {
+        const result = [];
+
+        try {
+            for (let index = 0; index < video.buffered.length; index++) {
+                result.push({
+                    start: video.buffered.start(index),
+                    end: video.buffered.end(index)
+                });
+            }
+        } catch (error) {
+            result.push({ error: String(error) });
+        }
+
+        return result;
+    }
+
+    function currentVideoState(extra = {}) {
+        return Object.assign({
+            type: "WC_RECEIVER_DEBUG",
+            sequence: ++receiverEventSequence,
+            receiverWallTimeMs: Date.now(),
+            receiverUptimeMs: Date.now() - receiverStartedAtMs,
+            lastVideoEvent: lastVideoEvent,
+            lastCommandAction: lastCommandAction,
+            lastCommandId: lastCommandId,
+            currentTime: Number.isFinite(video.currentTime) ? video.currentTime : null,
+            duration: Number.isFinite(video.duration) ? video.duration : null,
+            paused: video.paused,
+            ended: video.ended,
+            seeking: video.seeking,
+            readyState: video.readyState,
+            networkState: video.networkState,
+            playbackRate: video.playbackRate,
+            volume: video.volume,
+            muted: video.muted,
+            src: video.currentSrc || video.src || null,
+            error: video.error ? {
+                code: video.error.code,
+                message: video.error.message || null
+            } : null,
+            buffered: bufferedRanges(),
+            visibilityState: document.visibilityState,
+            online: navigator.onLine,
+            senderCount: (() => {
+                try {
+                    return context.getSenders().length;
+                } catch (error) {
+                    return -1;
+                }
+            })()
+        }, extra);
+    }
+
+    function sendDebugToSender(senderId, eventName, extra = {}) {
+        if (!senderId) return;
+
+        knownSenderIds.add(senderId);
+
+        const payload = currentVideoState(
+            Object.assign({
+                event: eventName,
+                senderId: senderId
+            }, extra)
+        );
+
+        try {
+            context.sendCustomMessage(
+                CONTROL_NAMESPACE,
+                senderId,
+                payload
+            );
+        } catch (error) {
+            console.error("WatcherCast debug send failed", error);
+        }
+    }
+
+    function broadcastDebug(eventName, extra = {}) {
+        const senderIds = new Set(knownSenderIds);
+
+        try {
+            context.getSenders().forEach(sender => {
+                if (sender && sender.id) {
+                    senderIds.add(sender.id);
+                }
+            });
+        } catch (error) {
+            console.error("WatcherCast getSenders failed", error);
+        }
+
+        senderIds.forEach(senderId => {
+            sendDebugToSender(senderId, eventName, extra);
+        });
+    }
+
+    function receiverEvent(eventName, extra = {}) {
+        lastVideoEvent = eventName;
+        console.log("WC_RECEIVER_DEBUG", eventName, currentVideoState(extra));
+        broadcastDebug(eventName, extra);
+    }
+
+    window.addEventListener("error", event => {
+        receiverEvent("WINDOW_ERROR", {
+            message: event.message || null,
+            filename: event.filename || null,
+            lineno: event.lineno || null,
+            colno: event.colno || null,
+            javascriptError: safeError(event.error)
+        });
+    });
+
+    window.addEventListener("unhandledrejection", event => {
+        receiverEvent("UNHANDLED_REJECTION", {
+            reason: safeError(event.reason)
+        });
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        receiverEvent("DOCUMENT_VISIBILITY_CHANGED", {
+            documentVisibility: document.visibilityState
+        });
+    });
+
+    window.addEventListener("online", () => receiverEvent("WINDOW_ONLINE"));
+    window.addEventListener("offline", () => receiverEvent("WINDOW_OFFLINE"));
 
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
@@ -318,6 +462,34 @@
         }, 100);
     }
 
+    [
+        "loadstart",
+        "loadedmetadata",
+        "loadeddata",
+        "durationchange",
+        "canplay",
+        "canplaythrough",
+        "play",
+        "playing",
+        "pause",
+        "waiting",
+        "stalled",
+        "suspend",
+        "seeking",
+        "seeked",
+        "progress",
+        "ratechange",
+        "volumechange",
+        "ended",
+        "emptied",
+        "abort",
+        "error"
+    ].forEach(eventName => {
+        video.addEventListener(eventName, () => {
+            receiverEvent("HTML_VIDEO_" + eventName.toUpperCase());
+        });
+    });
+
     playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.LOAD,
         requestData => {
@@ -326,6 +498,13 @@
             const media = requestData.media;
             const videoUrl = media && media.contentId;
             const tracks = media && media.tracks ? media.tracks : [];
+
+            receiverEvent("CAF_LOAD_INTERCEPTED", {
+                contentId: videoUrl || null,
+                contentType: media && media.contentType ? media.contentType : null,
+                streamType: media && media.streamType ? media.streamType : null,
+                trackCount: tracks.length
+            });
 
             if (!videoUrl) {
                 // setStatus("Geen video URL ontvangen");
@@ -397,14 +576,16 @@ if (tracks.length > 0) {
             video.load();
 
             video.play().then(() => {
-    // Playback gestart. Geen melding nodig.
+    receiverEvent("MANUAL_VIDEO_PLAY_RESOLVED");
 }).catch(error => {
-    // Deze play-interrupt is meestal onschuldig.
-    // Niet tonen op tv.
+    receiverEvent("MANUAL_VIDEO_PLAY_REJECTED", {
+        javascriptError: safeError(error)
+    });
 });
 
 
 video.onended = function () {
+    receiverEvent("VIDEO_ONENDED_HANDLER_ENTER");
     video.pause();
 
     video.currentTime = 0;
@@ -421,6 +602,7 @@ video.onended = function () {
     statusBox.style.display = "none";
 };
 video.onerror = function () {
+    receiverEvent("VIDEO_ONERROR_HANDLER_ENTER");
     let errorText = "Video kan niet worden afgespeeld.";
 
     if (video.error && video.error.code === 4) {
@@ -440,6 +622,10 @@ video.onerror = function () {
 
 
 
+            receiverEvent("CAF_LOAD_RETURN_REQUEST_DATA", {
+                contentId: videoUrl
+            });
+
             return requestData;
 
                     }
@@ -448,123 +634,161 @@ video.onerror = function () {
 
 
 context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
-    const command = event.data;
+    const senderId = event.senderId;
+    knownSenderIds.add(senderId);
 
+    let command = event.data;
 
-
-    if (!command || !command.action) {
-        return;
-    }
-
-    if (command.action === "ping") {
-
-    return;
-    }
-
-
-
-    if (command.action === "pause") {
-        video.pause();
-        setStatus("PAUSE");
-    }
-
-    if (command.action === "play") {
-        video.play();
-        setStatus("PLAY");
-    }
-
-    if (command.action === "toggle") {
-        if (video.paused) {
-            video.play();
-            setStatus("PLAY");
-        } else {
-            video.pause();
-            setStatus("PAUSE");
+    if (typeof command === "string") {
+        try {
+            command = JSON.parse(command);
+        } catch (error) {
+            sendDebugToSender(senderId, "COMMAND_JSON_PARSE_FAILED", {
+                rawCommand: event.data,
+                javascriptError: safeError(error)
+            });
+            return;
         }
     }
 
-
-    if (command.action === "changeRatio") {
-    ratioIndex = (ratioIndex + 1) % ratioModes.length;
-
-    const ratio = ratioModes[ratioIndex];
-
-    applyRatioMode(ratio.mode);
-
-    setStatus("Ratio: " + ratio.name);
+    if (!command || !command.action) {
+        sendDebugToSender(senderId, "COMMAND_INVALID", {
+            rawCommand: command
+        });
+        return;
     }
 
-    if (command.action === "seekBy") {
-        const offset = Number(command.offset || 0);
-        video.currentTime = Math.max(0, video.currentTime + offset);
-        setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+    const commandId =
+        command.debugCommandId !== undefined
+            ? command.debugCommandId
+            : null;
+
+    lastCommandAction = command.action;
+    lastCommandId = commandId;
+
+    sendDebugToSender(senderId, "COMMAND_RECEIVED", {
+        action: command.action,
+        commandId: commandId,
+        rawCommand: command
+    });
+
+    try {
+        if (command.action === "ping") {
+            sendDebugToSender(senderId, "COMMAND_APPLIED", {
+                action: command.action,
+                commandId: commandId
+            });
+            return;
+        }
+
+        if (command.action === "debugSnapshot") {
+            sendDebugToSender(senderId, "DEBUG_SNAPSHOT_RESPONSE", {
+                action: command.action,
+                commandId: commandId
+            });
+            return;
+        }
+
+        if (command.action === "pause") {
+            video.pause();
+            setStatus("PAUSE");
+        }
+
+        if (command.action === "play") {
+            video.play();
+            setStatus("PLAY");
+        }
+
+        if (command.action === "toggle") {
+            if (video.paused) {
+                video.play();
+                setStatus("PLAY");
+            } else {
+                video.pause();
+                setStatus("PAUSE");
+            }
+        }
+
+        if (command.action === "changeRatio") {
+            ratioIndex = (ratioIndex + 1) % ratioModes.length;
+
+            const ratio = ratioModes[ratioIndex];
+
+            applyRatioMode(ratio.mode);
+
+            setStatus("Ratio: " + ratio.name);
+        }
+
+        if (command.action === "seekBy") {
+            const offset = Number(command.offset || 0);
+            video.currentTime = Math.max(0, video.currentTime + offset);
+            setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+        }
+
+        if (command.action === "seekTo") {
+            const position = Number(command.position || 0);
+            video.currentTime = Math.max(0, position);
+            setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+        }
+
+        if (command.action === "subtitleVisibility") {
+            subtitlesVisible = command.visible === true;
+
+            if (!subtitlesVisible) {
+                subtitleBox.innerHTML = "";
+            }
+
+            if (command.silent !== true) {
+                setStatus(
+                    subtitlesVisible
+                        ? "Subtitles ON"
+                        : "Subtitles OFF"
+                );
+            }
+        }
+
+        if (command.action === "subtitleOffset") {
+            subtitleOffsetMs = Number(command.offset || 0);
+
+            if (command.silent !== true) {
+                setStatus(
+                    "Subtitle offset: " +
+                    subtitleOffsetMs +
+                    " ms"
+                );
+            }
+        }
+
+        if (command.action === "stop") {
+            video.pause();
+
+            video.currentTime = 0;
+            video.removeAttribute("src");
+            video.src = "";
+            video.load();
+
+            subtitleBox.innerHTML = "";
+            subtitleCues = [];
+
+            video.style.display = "none";
+            standbyScreen.style.display = "flex";
+
+            statusBox.style.display = "none";
+        }
+
+        sendDebugToSender(senderId, "COMMAND_APPLIED", {
+            action: command.action,
+            commandId: commandId
+        });
+    } catch (error) {
+        sendDebugToSender(senderId, "COMMAND_EXCEPTION", {
+            action: command.action,
+            commandId: commandId,
+            javascriptError: safeError(error)
+        });
     }
-
-
-    if (command.action === "seekTo") {
-    const position = Number(command.position || 0);
-    video.currentTime = Math.max(0, position);
-    setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
-}
-
-
-if (command.action === "subtitleVisibility") {
-
-    subtitlesVisible =
-        command.visible === true;
-
-    if (!subtitlesVisible) {
-        subtitleBox.innerHTML = "";
-    }
-
-    if (command.silent !== true) {
-    setStatus(
-        subtitlesVisible
-            ? "Subtitles ON"
-            : "Subtitles OFF"
-    );
-}
-}
-
-if (command.action === "subtitleOffset") {
-
-    subtitleOffsetMs =
-        Number(command.offset || 0);
-
-    if (command.silent !== true) {
-    setStatus(
-        "Subtitle offset: " +
-        subtitleOffsetMs +
-        " ms"
-    );
-}
-}
-
-   if (command.action === "stop") {
-    video.pause();
-
-    video.currentTime = 0;
-    video.removeAttribute("src");
-    video.src = "";
-    video.load();
-
-    subtitleBox.innerHTML = "";
-    subtitleCues = [];
-
-    video.style.display = "none";
-    standbyScreen.style.display = "flex";
-
-    statusBox.style.display = "none";
-}
-
-
-
-
-
-
-   
-
 });
+
 
 setInterval(() => {
     if (
@@ -585,6 +809,41 @@ setInterval(() => {
         });
     }
 }, PAUSE_KEEPALIVE_INTERVAL_MS);
+    setInterval(() => {
+        broadcastDebug("PERIODIC_TELEMETRY");
+    }, DEBUG_TELEMETRY_INTERVAL_MS);
+
+    try {
+        context.addEventListener(
+            cast.framework.system.EventType.SENDER_CONNECTED,
+            event => {
+                knownSenderIds.add(event.senderId);
+                sendDebugToSender(
+                    event.senderId,
+                    "SENDER_CONNECTED",
+                    { userAgent: event.userAgent || null }
+                );
+            }
+        );
+
+        context.addEventListener(
+            cast.framework.system.EventType.SENDER_DISCONNECTED,
+            event => {
+                sendDebugToSender(
+                    event.senderId,
+                    "SENDER_DISCONNECTED",
+                    {
+                        userAgent: event.userAgent || null,
+                        reason: event.reason || null
+                    }
+                );
+                knownSenderIds.delete(event.senderId);
+            }
+        );
+    } catch (error) {
+        console.error("WatcherCast sender event setup failed", error);
+    }
+
     context.start();
 </script>
 
