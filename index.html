@@ -192,6 +192,8 @@
     const standbyScreen = document.getElementById("standbyScreen");
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
     const DEBUG_TELEMETRY_INTERVAL_MS = 5000;
+    const OUT_OF_BAND_TELEMETRY_INTERVAL_MS = 2000;
+    const OUT_OF_BAND_TELEMETRY_PATH = "/__wc_receiver_telemetry";
 
     const knownSenderIds = new Set();
     let receiverStartedAtMs = Date.now();
@@ -199,6 +201,16 @@
     let lastVideoEvent = "receiver_created";
     let lastCommandAction = null;
     let lastCommandId = null;
+
+    // Onafhankelijk meetkanaal buiten de Google Cast namespace om.
+    // Dit POST rechtstreeks naar de VideoServer op de telefoon. Als dit
+    // kanaal blijft werken terwijl sender-ACK's stoppen, weten we dat het
+    // gewone Wi-Fi/HTTP-pad en de receiver-JavaScript nog leven.
+    let outOfBandTelemetryUrl = null;
+    let outOfBandSequence = 0;
+    let outOfBandConsecutiveFailures = 0;
+    let outOfBandLastSuccessAtMs = 0;
+    const queuedOutOfBandEvents = [];
 
     function safeError(error) {
         if (!error) return null;
@@ -264,6 +276,93 @@
         }, extra);
     }
 
+
+    function configureOutOfBandTelemetry(videoUrl) {
+        try {
+            const parsed = new URL(videoUrl);
+            outOfBandTelemetryUrl =
+                parsed.protocol + "//" + parsed.host + OUT_OF_BAND_TELEMETRY_PATH;
+
+            console.log(
+                "WC_RECEIVER_OOB",
+                "CONFIGURED",
+                outOfBandTelemetryUrl
+            );
+
+            while (queuedOutOfBandEvents.length > 0) {
+                const queued = queuedOutOfBandEvents.shift();
+                sendOutOfBandTelemetry(
+                    queued.eventName,
+                    queued.extra,
+                    false
+                );
+            }
+        } catch (error) {
+            console.error("WC receiver OOB URL setup failed", error);
+        }
+    }
+
+    function shouldSendOutOfBandEvent(eventName) {
+        return eventName !== "HTML_VIDEO_PROGRESS" &&
+            eventName !== "PERIODIC_TELEMETRY";
+    }
+
+    function sendOutOfBandTelemetry(eventName, extra = {}, queueIfUnavailable = true) {
+        if (!outOfBandTelemetryUrl) {
+            if (queueIfUnavailable && queuedOutOfBandEvents.length < 50) {
+                queuedOutOfBandEvents.push({ eventName, extra });
+            }
+            return;
+        }
+
+        const payload = currentVideoState(
+            Object.assign({
+                event: "OUT_OF_BAND_TELEMETRY",
+                outOfBandEvent: eventName,
+                outOfBandSequence: ++outOfBandSequence,
+                outOfBandConsecutiveFailures: outOfBandConsecutiveFailures,
+                outOfBandLastSuccessAtMs: outOfBandLastSuccessAtMs
+            }, extra)
+        );
+
+        fetch(outOfBandTelemetryUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=UTF-8"
+            },
+            body: JSON.stringify(payload),
+            cache: "no-store",
+            keepalive: true
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+
+            const hadFailures = outOfBandConsecutiveFailures > 0;
+            outOfBandConsecutiveFailures = 0;
+            outOfBandLastSuccessAtMs = Date.now();
+
+            if (hadFailures) {
+                console.log(
+                    "WC_RECEIVER_OOB",
+                    "RECOVERED",
+                    eventName,
+                    payload.outOfBandSequence
+                );
+            }
+        }).catch(error => {
+            outOfBandConsecutiveFailures += 1;
+            console.error(
+                "WC_RECEIVER_OOB",
+                "SEND_FAILED",
+                eventName,
+                payload.outOfBandSequence,
+                outOfBandConsecutiveFailures,
+                error
+            );
+        });
+    }
+
     function sendDebugToSender(senderId, eventName, extra = {}) {
         if (!senderId) return;
 
@@ -320,6 +419,10 @@
             console.error("CastDebugLogger write failed", error);
         }
         broadcastDebug(eventName, extra);
+
+        if (shouldSendOutOfBandEvent(eventName)) {
+            sendOutOfBandTelemetry(eventName, extra, true);
+        }
     }
 
     window.addEventListener("error", event => {
@@ -538,6 +641,10 @@
             const videoUrl = media && media.contentId;
             const tracks = media && media.tracks ? media.tracks : [];
 
+            if (videoUrl) {
+                configureOutOfBandTelemetry(videoUrl);
+            }
+
             receiverEvent("CAF_LOAD_INTERCEPTED", {
                 contentId: videoUrl || null,
                 contentType: media && media.contentType ? media.contentType : null,
@@ -705,6 +812,13 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
     lastCommandAction = command.action;
     lastCommandId = commandId;
 
+    sendOutOfBandTelemetry("CONTROL_COMMAND_RECEIVED", {
+        senderId: senderId,
+        action: command.action,
+        commandId: commandId,
+        senderWallTimeMs: command.senderWallTimeMs || null
+    }, true);
+
     sendDebugToSender(senderId, "COMMAND_RECEIVED", {
         action: command.action,
         commandId: commandId,
@@ -713,6 +827,13 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
 
     try {
         if (command.action === "ping") {
+            sendOutOfBandTelemetry("CONTROL_PING_APPLIED", {
+                senderId: senderId,
+                action: command.action,
+                commandId: commandId,
+                senderWallTimeMs: command.senderWallTimeMs || null
+            }, true);
+
             sendDebugToSender(senderId, "COMMAND_APPLIED", {
                 action: command.action,
                 commandId: commandId
@@ -822,11 +943,24 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
             statusBox.style.display = "none";
         }
 
+        sendOutOfBandTelemetry("CONTROL_COMMAND_APPLIED", {
+            senderId: senderId,
+            action: command.action,
+            commandId: commandId
+        }, true);
+
         sendDebugToSender(senderId, "COMMAND_APPLIED", {
             action: command.action,
             commandId: commandId
         });
     } catch (error) {
+        sendOutOfBandTelemetry("CONTROL_COMMAND_EXCEPTION", {
+            senderId: senderId,
+            action: command.action,
+            commandId: commandId,
+            javascriptError: safeError(error)
+        }, true);
+
         sendDebugToSender(senderId, "COMMAND_EXCEPTION", {
             action: command.action,
             commandId: commandId,
@@ -859,11 +993,25 @@ setInterval(() => {
         broadcastDebug("PERIODIC_TELEMETRY");
     }, DEBUG_TELEMETRY_INTERVAL_MS);
 
+    setInterval(() => {
+        sendOutOfBandTelemetry("PERIODIC_RECEIVER_LIVENESS", {
+            senderIds: Array.from(knownSenderIds)
+        }, false);
+    }, OUT_OF_BAND_TELEMETRY_INTERVAL_MS);
+
     try {
         context.addEventListener(
             cast.framework.system.EventType.SENDER_CONNECTED,
             event => {
                 knownSenderIds.add(event.senderId);
+                sendOutOfBandTelemetry(
+                    "SENDER_CONNECTED",
+                    {
+                        senderId: event.senderId,
+                        userAgent: event.userAgent || null
+                    },
+                    true
+                );
                 sendDebugToSender(
                     event.senderId,
                     "SENDER_CONNECTED",
@@ -875,6 +1023,15 @@ setInterval(() => {
         context.addEventListener(
             cast.framework.system.EventType.SENDER_DISCONNECTED,
             event => {
+                sendOutOfBandTelemetry(
+                    "SENDER_DISCONNECTED",
+                    {
+                        senderId: event.senderId,
+                        userAgent: event.userAgent || null,
+                        reason: event.reason || null
+                    },
+                    true
+                );
                 sendDebugToSender(
                     event.senderId,
                     "SENDER_DISCONNECTED",
@@ -902,4 +1059,4 @@ setInterval(() => {
 
 
 
-<!-- VERSION 124 - V6 BLACK BOX DIAGNOSTICS -->
+<!-- VERSION 125 - V7 HEARTBEAT CAUSE DIAGNOSTICS -->
