@@ -5,6 +5,7 @@
     <title>WatcherCast Receiver</title>
 
     <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="https://www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
 
     <style>
         html, body {
@@ -157,6 +158,33 @@
 <script>
     const context = cast.framework.CastReceiverContext.getInstance();
     const playerManager = context.getPlayerManager();
+    const BLACK_BOX_LOG_TAG = "WatcherCastV6";
+    let castDebugLogger = null;
+
+    try {
+        castDebugLogger = cast.debug.CastDebugLogger.getInstance();
+        castDebugLogger.loggerLevelByTags = {
+            [BLACK_BOX_LOG_TAG]: cast.framework.LoggerLevel.DEBUG
+        };
+        castDebugLogger.loggerLevelByEvents = {
+            "cast.framework.events.category.CORE": cast.framework.LoggerLevel.INFO,
+            "cast.framework.events.EventType.MEDIA_STATUS": cast.framework.LoggerLevel.DEBUG
+        };
+
+        context.addEventListener(cast.framework.system.EventType.READY, () => {
+            try {
+                if (!castDebugLogger.debugOverlayElement_) {
+                    castDebugLogger.setEnabled(true);
+                }
+                castDebugLogger.showDebugLogs(false);
+                castDebugLogger.info(BLACK_BOX_LOG_TAG, "RECEIVER_READY");
+            } catch (error) {
+                console.error("CastDebugLogger READY setup failed", error);
+            }
+        });
+    } catch (error) {
+        console.error("CastDebugLogger initialization failed", error);
+    }
 
     const video = document.getElementById("video");
     const statusBox = document.getElementById("status");
@@ -279,7 +307,18 @@
 
     function receiverEvent(eventName, extra = {}) {
         lastVideoEvent = eventName;
-        console.log("WC_RECEIVER_DEBUG", eventName, currentVideoState(extra));
+        const state = currentVideoState(extra);
+        console.log("WC_RECEIVER_DEBUG", eventName, state);
+        try {
+            if (castDebugLogger) {
+                castDebugLogger.debug(
+                    BLACK_BOX_LOG_TAG,
+                    eventName + " | " + JSON.stringify(state)
+                );
+            }
+        } catch (error) {
+            console.error("CastDebugLogger write failed", error);
+        }
         broadcastDebug(eventName, extra);
     }
 
@@ -682,9 +721,16 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
         }
 
         if (command.action === "debugSnapshot") {
+            const markerId = command.markerId || null;
+            receiverEvent("FAULT_MARKER_RECEIVED", {
+                senderId: senderId,
+                commandId: commandId,
+                markerId: markerId
+            });
             sendDebugToSender(senderId, "DEBUG_SNAPSHOT_RESPONSE", {
                 action: command.action,
-                commandId: commandId
+                commandId: commandId,
+                markerId: markerId
             });
             return;
         }
@@ -856,4 +902,4 @@ setInterval(() => {
 
 
 
-<!-- VERSION 123 -->
+<!-- VERSION 124 - V6 BLACK BOX DIAGNOSTICS -->
