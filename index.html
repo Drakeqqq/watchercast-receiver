@@ -447,123 +447,136 @@ video.onerror = function () {
 
 
 
+
+function sendControlAck(senderId, command, ok = true, errorMessage = null) {
+    if (!senderId || !command) return;
+
+    try {
+        context.sendCustomMessage(
+            CONTROL_NAMESPACE,
+            senderId,
+            {
+                type: "WC_CONTROL_ACK",
+                commandId: command.commandId !== undefined ? command.commandId : null,
+                action: command.action || null,
+                ok: ok,
+                error: errorMessage,
+                receiverTimeMs: Date.now(),
+                currentTime: Number.isFinite(video.currentTime)
+                    ? video.currentTime
+                    : null,
+                paused: video.paused,
+                ended: video.ended
+            }
+        );
+    } catch (error) {
+        // ACK is best effort; playback must never be disturbed by diagnostics.
+    }
+}
+
 context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
-    const command = event.data;
+    let command = event.data;
 
-
+    if (typeof command === "string") {
+        try {
+            command = JSON.parse(command);
+        } catch (error) {
+            return;
+        }
+    }
 
     if (!command || !command.action) {
         return;
     }
 
-    if (command.action === "ping") {
+    try {
+        if (command.action === "ping") {
+            sendControlAck(event.senderId, command);
+            return;
+        }
 
-    return;
-    }
-
-
-
-    if (command.action === "pause") {
-        video.pause();
-        setStatus("PAUSE");
-    }
-
-    if (command.action === "play") {
-        video.play();
-        setStatus("PLAY");
-    }
-
-    if (command.action === "toggle") {
-        if (video.paused) {
-            video.play();
-            setStatus("PLAY");
-        } else {
+        if (command.action === "pause") {
             video.pause();
             setStatus("PAUSE");
         }
+
+        if (command.action === "play") {
+            video.play();
+            setStatus("PLAY");
+        }
+
+        if (command.action === "toggle") {
+            if (video.paused) {
+                video.play();
+                setStatus("PLAY");
+            } else {
+                video.pause();
+                setStatus("PAUSE");
+            }
+        }
+
+        if (command.action === "changeRatio") {
+            ratioIndex = (ratioIndex + 1) % ratioModes.length;
+            const ratio = ratioModes[ratioIndex];
+            applyRatioMode(ratio.mode);
+            setStatus("Ratio: " + ratio.name);
+        }
+
+        if (command.action === "seekBy") {
+            const offset = Number(command.offset || 0);
+            video.currentTime = Math.max(0, video.currentTime + offset);
+            setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+        }
+
+        if (command.action === "seekTo") {
+            const position = Number(command.position || 0);
+            video.currentTime = Math.max(0, position);
+            setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+        }
+
+        if (command.action === "subtitleVisibility") {
+            subtitlesVisible = command.visible === true;
+
+            if (!subtitlesVisible) {
+                subtitleBox.innerHTML = "";
+            }
+
+            if (command.silent !== true) {
+                setStatus(subtitlesVisible ? "Subtitles ON" : "Subtitles OFF");
+            }
+        }
+
+        if (command.action === "subtitleOffset") {
+            subtitleOffsetMs = Number(command.offset || 0);
+
+            if (command.silent !== true) {
+                setStatus("Subtitle offset: " + subtitleOffsetMs + " ms");
+            }
+        }
+
+        if (command.action === "stop") {
+            video.pause();
+            video.currentTime = 0;
+            video.removeAttribute("src");
+            video.src = "";
+            video.load();
+
+            subtitleBox.innerHTML = "";
+            subtitleCues = [];
+            video.style.display = "none";
+            standbyScreen.style.display = "flex";
+            statusBox.style.display = "none";
+        }
+
+        sendControlAck(event.senderId, command);
+    } catch (error) {
+        sendControlAck(
+            event.senderId,
+            command,
+            false,
+            error && error.message ? error.message : String(error)
+        );
     }
-
-
-    if (command.action === "changeRatio") {
-    ratioIndex = (ratioIndex + 1) % ratioModes.length;
-
-    const ratio = ratioModes[ratioIndex];
-
-    applyRatioMode(ratio.mode);
-
-    setStatus("Ratio: " + ratio.name);
-    }
-
-    if (command.action === "seekBy") {
-        const offset = Number(command.offset || 0);
-        video.currentTime = Math.max(0, video.currentTime + offset);
-        setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
-    }
-
-
-    if (command.action === "seekTo") {
-    const position = Number(command.position || 0);
-    video.currentTime = Math.max(0, position);
-    setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
-}
-
-
-if (command.action === "subtitleVisibility") {
-
-    subtitlesVisible =
-        command.visible === true;
-
-    if (!subtitlesVisible) {
-        subtitleBox.innerHTML = "";
-    }
-
-    if (command.silent !== true) {
-    setStatus(
-        subtitlesVisible
-            ? "Subtitles ON"
-            : "Subtitles OFF"
-    );
-}
-}
-
-if (command.action === "subtitleOffset") {
-
-    subtitleOffsetMs =
-        Number(command.offset || 0);
-
-    if (command.silent !== true) {
-    setStatus(
-        "Subtitle offset: " +
-        subtitleOffsetMs +
-        " ms"
-    );
-}
-}
-
-   if (command.action === "stop") {
-    video.pause();
-
-    video.currentTime = 0;
-    video.removeAttribute("src");
-    video.src = "";
-    video.load();
-
-    subtitleBox.innerHTML = "";
-    subtitleCues = [];
-
-    video.style.display = "none";
-    standbyScreen.style.display = "flex";
-
-    statusBox.style.display = "none";
-}
-
-
-
-
-
-
-   
-
 });
 
 setInterval(() => {
