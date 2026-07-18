@@ -5,7 +5,6 @@
     <title>WatcherCast Receiver</title>
 
     <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-    <script src="https://www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
 
     <style>
         html, body {
@@ -158,297 +157,12 @@
 <script>
     const context = cast.framework.CastReceiverContext.getInstance();
     const playerManager = context.getPlayerManager();
-    const BLACK_BOX_LOG_TAG = "WatcherCastV6";
-    let castDebugLogger = null;
-
-    try {
-        castDebugLogger = cast.debug.CastDebugLogger.getInstance();
-        castDebugLogger.loggerLevelByTags = {
-            [BLACK_BOX_LOG_TAG]: cast.framework.LoggerLevel.DEBUG
-        };
-        castDebugLogger.loggerLevelByEvents = {
-            "cast.framework.events.category.CORE": cast.framework.LoggerLevel.INFO,
-            "cast.framework.events.EventType.MEDIA_STATUS": cast.framework.LoggerLevel.DEBUG
-        };
-
-        context.addEventListener(cast.framework.system.EventType.READY, () => {
-            try {
-                if (!castDebugLogger.debugOverlayElement_) {
-                    castDebugLogger.setEnabled(true);
-                }
-                castDebugLogger.showDebugLogs(false);
-                castDebugLogger.info(BLACK_BOX_LOG_TAG, "RECEIVER_READY");
-            } catch (error) {
-                console.error("CastDebugLogger READY setup failed", error);
-            }
-        });
-    } catch (error) {
-        console.error("CastDebugLogger initialization failed", error);
-    }
 
     const video = document.getElementById("video");
     const statusBox = document.getElementById("status");
     const subtitleBox = document.getElementById("subtitleBox");
     const standbyScreen = document.getElementById("standbyScreen");
     const CONTROL_NAMESPACE = "urn:x-cast:com.example.watchercastv2.controls";
-    const DEBUG_TELEMETRY_INTERVAL_MS = 5000;
-    const OUT_OF_BAND_TELEMETRY_INTERVAL_MS = 2000;
-    const OUT_OF_BAND_TELEMETRY_PATH = "/__wc_receiver_telemetry";
-
-    const knownSenderIds = new Set();
-    let receiverStartedAtMs = Date.now();
-    let receiverEventSequence = 0;
-    let lastVideoEvent = "receiver_created";
-    let lastCommandAction = null;
-    let lastCommandId = null;
-
-    // Onafhankelijk meetkanaal buiten de Google Cast namespace om.
-    // Dit POST rechtstreeks naar de VideoServer op de telefoon. Als dit
-    // kanaal blijft werken terwijl sender-ACK's stoppen, weten we dat het
-    // gewone Wi-Fi/HTTP-pad en de receiver-JavaScript nog leven.
-    let outOfBandTelemetryUrl = null;
-    let outOfBandSequence = 0;
-    let outOfBandConsecutiveFailures = 0;
-    let outOfBandLastSuccessAtMs = 0;
-    const queuedOutOfBandEvents = [];
-
-    function safeError(error) {
-        if (!error) return null;
-
-        return {
-            name: error.name || null,
-            message: error.message || String(error),
-            stack: error.stack || null
-        };
-    }
-
-    function bufferedRanges() {
-        const result = [];
-
-        try {
-            for (let index = 0; index < video.buffered.length; index++) {
-                result.push({
-                    start: video.buffered.start(index),
-                    end: video.buffered.end(index)
-                });
-            }
-        } catch (error) {
-            result.push({ error: String(error) });
-        }
-
-        return result;
-    }
-
-    function currentVideoState(extra = {}) {
-        return Object.assign({
-            type: "WC_RECEIVER_DEBUG",
-            sequence: ++receiverEventSequence,
-            receiverWallTimeMs: Date.now(),
-            receiverUptimeMs: Date.now() - receiverStartedAtMs,
-            lastVideoEvent: lastVideoEvent,
-            lastCommandAction: lastCommandAction,
-            lastCommandId: lastCommandId,
-            currentTime: Number.isFinite(video.currentTime) ? video.currentTime : null,
-            duration: Number.isFinite(video.duration) ? video.duration : null,
-            paused: video.paused,
-            ended: video.ended,
-            seeking: video.seeking,
-            readyState: video.readyState,
-            networkState: video.networkState,
-            playbackRate: video.playbackRate,
-            volume: video.volume,
-            muted: video.muted,
-            src: video.currentSrc || video.src || null,
-            error: video.error ? {
-                code: video.error.code,
-                message: video.error.message || null
-            } : null,
-            buffered: bufferedRanges(),
-            visibilityState: document.visibilityState,
-            online: navigator.onLine,
-            senderCount: (() => {
-                try {
-                    return context.getSenders().length;
-                } catch (error) {
-                    return -1;
-                }
-            })()
-        }, extra);
-    }
-
-
-    function configureOutOfBandTelemetry(videoUrl) {
-        try {
-            const parsed = new URL(videoUrl);
-            outOfBandTelemetryUrl =
-                parsed.protocol + "//" + parsed.host + OUT_OF_BAND_TELEMETRY_PATH;
-
-            console.log(
-                "WC_RECEIVER_OOB",
-                "CONFIGURED",
-                outOfBandTelemetryUrl
-            );
-
-            while (queuedOutOfBandEvents.length > 0) {
-                const queued = queuedOutOfBandEvents.shift();
-                sendOutOfBandTelemetry(
-                    queued.eventName,
-                    queued.extra,
-                    false
-                );
-            }
-        } catch (error) {
-            console.error("WC receiver OOB URL setup failed", error);
-        }
-    }
-
-    function shouldSendOutOfBandEvent(eventName) {
-        return eventName !== "HTML_VIDEO_PROGRESS" &&
-            eventName !== "PERIODIC_TELEMETRY";
-    }
-
-    function sendOutOfBandTelemetry(eventName, extra = {}, queueIfUnavailable = true) {
-        if (!outOfBandTelemetryUrl) {
-            if (queueIfUnavailable && queuedOutOfBandEvents.length < 50) {
-                queuedOutOfBandEvents.push({ eventName, extra });
-            }
-            return;
-        }
-
-        const payload = currentVideoState(
-            Object.assign({
-                event: "OUT_OF_BAND_TELEMETRY",
-                outOfBandEvent: eventName,
-                outOfBandSequence: ++outOfBandSequence,
-                outOfBandConsecutiveFailures: outOfBandConsecutiveFailures,
-                outOfBandLastSuccessAtMs: outOfBandLastSuccessAtMs
-            }, extra)
-        );
-
-        fetch(outOfBandTelemetryUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "text/plain;charset=UTF-8"
-            },
-            body: JSON.stringify(payload),
-            cache: "no-store",
-            keepalive: true
-        }).then(response => {
-            if (!response.ok) {
-                throw new Error("HTTP " + response.status);
-            }
-
-            const hadFailures = outOfBandConsecutiveFailures > 0;
-            outOfBandConsecutiveFailures = 0;
-            outOfBandLastSuccessAtMs = Date.now();
-
-            if (hadFailures) {
-                console.log(
-                    "WC_RECEIVER_OOB",
-                    "RECOVERED",
-                    eventName,
-                    payload.outOfBandSequence
-                );
-            }
-        }).catch(error => {
-            outOfBandConsecutiveFailures += 1;
-            console.error(
-                "WC_RECEIVER_OOB",
-                "SEND_FAILED",
-                eventName,
-                payload.outOfBandSequence,
-                outOfBandConsecutiveFailures,
-                error
-            );
-        });
-    }
-
-    function sendDebugToSender(senderId, eventName, extra = {}) {
-        if (!senderId) return;
-
-        knownSenderIds.add(senderId);
-
-        const payload = currentVideoState(
-            Object.assign({
-                event: eventName,
-                senderId: senderId
-            }, extra)
-        );
-
-        try {
-            context.sendCustomMessage(
-                CONTROL_NAMESPACE,
-                senderId,
-                payload
-            );
-        } catch (error) {
-            console.error("WatcherCast debug send failed", error);
-        }
-    }
-
-    function broadcastDebug(eventName, extra = {}) {
-        const senderIds = new Set(knownSenderIds);
-
-        try {
-            context.getSenders().forEach(sender => {
-                if (sender && sender.id) {
-                    senderIds.add(sender.id);
-                }
-            });
-        } catch (error) {
-            console.error("WatcherCast getSenders failed", error);
-        }
-
-        senderIds.forEach(senderId => {
-            sendDebugToSender(senderId, eventName, extra);
-        });
-    }
-
-    function receiverEvent(eventName, extra = {}) {
-        lastVideoEvent = eventName;
-        const state = currentVideoState(extra);
-        console.log("WC_RECEIVER_DEBUG", eventName, state);
-        try {
-            if (castDebugLogger) {
-                castDebugLogger.debug(
-                    BLACK_BOX_LOG_TAG,
-                    eventName + " | " + JSON.stringify(state)
-                );
-            }
-        } catch (error) {
-            console.error("CastDebugLogger write failed", error);
-        }
-        broadcastDebug(eventName, extra);
-
-        if (shouldSendOutOfBandEvent(eventName)) {
-            sendOutOfBandTelemetry(eventName, extra, true);
-        }
-    }
-
-    window.addEventListener("error", event => {
-        receiverEvent("WINDOW_ERROR", {
-            message: event.message || null,
-            filename: event.filename || null,
-            lineno: event.lineno || null,
-            colno: event.colno || null,
-            javascriptError: safeError(event.error)
-        });
-    });
-
-    window.addEventListener("unhandledrejection", event => {
-        receiverEvent("UNHANDLED_REJECTION", {
-            reason: safeError(event.reason)
-        });
-    });
-
-    document.addEventListener("visibilitychange", () => {
-        receiverEvent("DOCUMENT_VISIBILITY_CHANGED", {
-            documentVisibility: document.visibilityState
-        });
-    });
-
-    window.addEventListener("online", () => receiverEvent("WINDOW_ONLINE"));
-    window.addEventListener("offline", () => receiverEvent("WINDOW_OFFLINE"));
 
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
@@ -604,34 +318,6 @@
         }, 100);
     }
 
-    [
-        "loadstart",
-        "loadedmetadata",
-        "loadeddata",
-        "durationchange",
-        "canplay",
-        "canplaythrough",
-        "play",
-        "playing",
-        "pause",
-        "waiting",
-        "stalled",
-        "suspend",
-        "seeking",
-        "seeked",
-        "progress",
-        "ratechange",
-        "volumechange",
-        "ended",
-        "emptied",
-        "abort",
-        "error"
-    ].forEach(eventName => {
-        video.addEventListener(eventName, () => {
-            receiverEvent("HTML_VIDEO_" + eventName.toUpperCase());
-        });
-    });
-
     playerManager.setMessageInterceptor(
         cast.framework.messages.MessageType.LOAD,
         requestData => {
@@ -640,17 +326,6 @@
             const media = requestData.media;
             const videoUrl = media && media.contentId;
             const tracks = media && media.tracks ? media.tracks : [];
-
-            if (videoUrl) {
-                configureOutOfBandTelemetry(videoUrl);
-            }
-
-            receiverEvent("CAF_LOAD_INTERCEPTED", {
-                contentId: videoUrl || null,
-                contentType: media && media.contentType ? media.contentType : null,
-                streamType: media && media.streamType ? media.streamType : null,
-                trackCount: tracks.length
-            });
 
             if (!videoUrl) {
                 // setStatus("Geen video URL ontvangen");
@@ -722,16 +397,14 @@ if (tracks.length > 0) {
             video.load();
 
             video.play().then(() => {
-    receiverEvent("MANUAL_VIDEO_PLAY_RESOLVED");
+    // Playback gestart. Geen melding nodig.
 }).catch(error => {
-    receiverEvent("MANUAL_VIDEO_PLAY_REJECTED", {
-        javascriptError: safeError(error)
-    });
+    // Deze play-interrupt is meestal onschuldig.
+    // Niet tonen op tv.
 });
 
 
 video.onended = function () {
-    receiverEvent("VIDEO_ONENDED_HANDLER_ENTER");
     video.pause();
 
     video.currentTime = 0;
@@ -748,7 +421,6 @@ video.onended = function () {
     statusBox.style.display = "none";
 };
 video.onerror = function () {
-    receiverEvent("VIDEO_ONERROR_HANDLER_ENTER");
     let errorText = "Video kan niet worden afgespeeld.";
 
     if (video.error && video.error.code === 4) {
@@ -768,10 +440,6 @@ video.onerror = function () {
 
 
 
-            receiverEvent("CAF_LOAD_RETURN_REQUEST_DATA", {
-                contentId: videoUrl
-            });
-
             return requestData;
 
                     }
@@ -780,195 +448,123 @@ video.onerror = function () {
 
 
 context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
-    const senderId = event.senderId;
-    knownSenderIds.add(senderId);
+    const command = event.data;
 
-    let command = event.data;
 
-    if (typeof command === "string") {
-        try {
-            command = JSON.parse(command);
-        } catch (error) {
-            sendDebugToSender(senderId, "COMMAND_JSON_PARSE_FAILED", {
-                rawCommand: event.data,
-                javascriptError: safeError(error)
-            });
-            return;
-        }
-    }
 
     if (!command || !command.action) {
-        sendDebugToSender(senderId, "COMMAND_INVALID", {
-            rawCommand: command
-        });
         return;
     }
 
-    const commandId =
-        command.debugCommandId !== undefined
-            ? command.debugCommandId
-            : null;
+    if (command.action === "ping") {
 
-    lastCommandAction = command.action;
-    lastCommandId = commandId;
+    return;
+    }
 
-    sendOutOfBandTelemetry("CONTROL_COMMAND_RECEIVED", {
-        senderId: senderId,
-        action: command.action,
-        commandId: commandId,
-        senderWallTimeMs: command.senderWallTimeMs || null
-    }, true);
 
-    sendDebugToSender(senderId, "COMMAND_RECEIVED", {
-        action: command.action,
-        commandId: commandId,
-        rawCommand: command
-    });
 
-    try {
-        if (command.action === "ping") {
-            sendOutOfBandTelemetry("CONTROL_PING_APPLIED", {
-                senderId: senderId,
-                action: command.action,
-                commandId: commandId,
-                senderWallTimeMs: command.senderWallTimeMs || null
-            }, true);
+    if (command.action === "pause") {
+        video.pause();
+        setStatus("PAUSE");
+    }
 
-            sendDebugToSender(senderId, "COMMAND_APPLIED", {
-                action: command.action,
-                commandId: commandId
-            });
-            return;
-        }
+    if (command.action === "play") {
+        video.play();
+        setStatus("PLAY");
+    }
 
-        if (command.action === "debugSnapshot") {
-            const markerId = command.markerId || null;
-            receiverEvent("FAULT_MARKER_RECEIVED", {
-                senderId: senderId,
-                commandId: commandId,
-                markerId: markerId
-            });
-            sendDebugToSender(senderId, "DEBUG_SNAPSHOT_RESPONSE", {
-                action: command.action,
-                commandId: commandId,
-                markerId: markerId
-            });
-            return;
-        }
-
-        if (command.action === "pause") {
+    if (command.action === "toggle") {
+        if (video.paused) {
+            video.play();
+            setStatus("PLAY");
+        } else {
             video.pause();
             setStatus("PAUSE");
         }
-
-        if (command.action === "play") {
-            video.play();
-            setStatus("PLAY");
-        }
-
-        if (command.action === "toggle") {
-            if (video.paused) {
-                video.play();
-                setStatus("PLAY");
-            } else {
-                video.pause();
-                setStatus("PAUSE");
-            }
-        }
-
-        if (command.action === "changeRatio") {
-            ratioIndex = (ratioIndex + 1) % ratioModes.length;
-
-            const ratio = ratioModes[ratioIndex];
-
-            applyRatioMode(ratio.mode);
-
-            setStatus("Ratio: " + ratio.name);
-        }
-
-        if (command.action === "seekBy") {
-            const offset = Number(command.offset || 0);
-            video.currentTime = Math.max(0, video.currentTime + offset);
-            setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
-        }
-
-        if (command.action === "seekTo") {
-            const position = Number(command.position || 0);
-            video.currentTime = Math.max(0, position);
-            setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
-        }
-
-        if (command.action === "subtitleVisibility") {
-            subtitlesVisible = command.visible === true;
-
-            if (!subtitlesVisible) {
-                subtitleBox.innerHTML = "";
-            }
-
-            if (command.silent !== true) {
-                setStatus(
-                    subtitlesVisible
-                        ? "Subtitles ON"
-                        : "Subtitles OFF"
-                );
-            }
-        }
-
-        if (command.action === "subtitleOffset") {
-            subtitleOffsetMs = Number(command.offset || 0);
-
-            if (command.silent !== true) {
-                setStatus(
-                    "Subtitle offset: " +
-                    subtitleOffsetMs +
-                    " ms"
-                );
-            }
-        }
-
-        if (command.action === "stop") {
-            video.pause();
-
-            video.currentTime = 0;
-            video.removeAttribute("src");
-            video.src = "";
-            video.load();
-
-            subtitleBox.innerHTML = "";
-            subtitleCues = [];
-
-            video.style.display = "none";
-            standbyScreen.style.display = "flex";
-
-            statusBox.style.display = "none";
-        }
-
-        sendOutOfBandTelemetry("CONTROL_COMMAND_APPLIED", {
-            senderId: senderId,
-            action: command.action,
-            commandId: commandId
-        }, true);
-
-        sendDebugToSender(senderId, "COMMAND_APPLIED", {
-            action: command.action,
-            commandId: commandId
-        });
-    } catch (error) {
-        sendOutOfBandTelemetry("CONTROL_COMMAND_EXCEPTION", {
-            senderId: senderId,
-            action: command.action,
-            commandId: commandId,
-            javascriptError: safeError(error)
-        }, true);
-
-        sendDebugToSender(senderId, "COMMAND_EXCEPTION", {
-            action: command.action,
-            commandId: commandId,
-            javascriptError: safeError(error)
-        });
     }
-});
 
+
+    if (command.action === "changeRatio") {
+    ratioIndex = (ratioIndex + 1) % ratioModes.length;
+
+    const ratio = ratioModes[ratioIndex];
+
+    applyRatioMode(ratio.mode);
+
+    setStatus("Ratio: " + ratio.name);
+    }
+
+    if (command.action === "seekBy") {
+        const offset = Number(command.offset || 0);
+        video.currentTime = Math.max(0, video.currentTime + offset);
+        setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+    }
+
+
+    if (command.action === "seekTo") {
+    const position = Number(command.position || 0);
+    video.currentTime = Math.max(0, position);
+    setStatus("SEEK: " + Math.round(video.currentTime) + " sec");
+}
+
+
+if (command.action === "subtitleVisibility") {
+
+    subtitlesVisible =
+        command.visible === true;
+
+    if (!subtitlesVisible) {
+        subtitleBox.innerHTML = "";
+    }
+
+    if (command.silent !== true) {
+    setStatus(
+        subtitlesVisible
+            ? "Subtitles ON"
+            : "Subtitles OFF"
+    );
+}
+}
+
+if (command.action === "subtitleOffset") {
+
+    subtitleOffsetMs =
+        Number(command.offset || 0);
+
+    if (command.silent !== true) {
+    setStatus(
+        "Subtitle offset: " +
+        subtitleOffsetMs +
+        " ms"
+    );
+}
+}
+
+   if (command.action === "stop") {
+    video.pause();
+
+    video.currentTime = 0;
+    video.removeAttribute("src");
+    video.src = "";
+    video.load();
+
+    subtitleBox.innerHTML = "";
+    subtitleCues = [];
+
+    video.style.display = "none";
+    standbyScreen.style.display = "flex";
+
+    statusBox.style.display = "none";
+}
+
+
+
+
+
+
+   
+
+});
 
 setInterval(() => {
     if (
@@ -989,64 +585,6 @@ setInterval(() => {
         });
     }
 }, PAUSE_KEEPALIVE_INTERVAL_MS);
-    setInterval(() => {
-        broadcastDebug("PERIODIC_TELEMETRY");
-    }, DEBUG_TELEMETRY_INTERVAL_MS);
-
-    setInterval(() => {
-        sendOutOfBandTelemetry("PERIODIC_RECEIVER_LIVENESS", {
-            senderIds: Array.from(knownSenderIds)
-        }, false);
-    }, OUT_OF_BAND_TELEMETRY_INTERVAL_MS);
-
-    try {
-        context.addEventListener(
-            cast.framework.system.EventType.SENDER_CONNECTED,
-            event => {
-                knownSenderIds.add(event.senderId);
-                sendOutOfBandTelemetry(
-                    "SENDER_CONNECTED",
-                    {
-                        senderId: event.senderId,
-                        userAgent: event.userAgent || null
-                    },
-                    true
-                );
-                sendDebugToSender(
-                    event.senderId,
-                    "SENDER_CONNECTED",
-                    { userAgent: event.userAgent || null }
-                );
-            }
-        );
-
-        context.addEventListener(
-            cast.framework.system.EventType.SENDER_DISCONNECTED,
-            event => {
-                sendOutOfBandTelemetry(
-                    "SENDER_DISCONNECTED",
-                    {
-                        senderId: event.senderId,
-                        userAgent: event.userAgent || null,
-                        reason: event.reason || null
-                    },
-                    true
-                );
-                sendDebugToSender(
-                    event.senderId,
-                    "SENDER_DISCONNECTED",
-                    {
-                        userAgent: event.userAgent || null,
-                        reason: event.reason || null
-                    }
-                );
-                knownSenderIds.delete(event.senderId);
-            }
-        );
-    } catch (error) {
-        console.error("WatcherCast sender event setup failed", error);
-    }
-
     context.start();
 </script>
 
@@ -1059,4 +597,4 @@ setInterval(() => {
 
 
 
-<!-- VERSION 125 - V7 HEARTBEAT CAUSE DIAGNOSTICS -->
+<!-- VERSION 123 -->
