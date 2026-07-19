@@ -130,7 +130,7 @@
 
     
 /* =========================================================
-   WatcherCast V124 - echte bron-tijdlijn
+   WatcherCast V125 - echte bron-tijdlijn + subtitle seek fix
    ========================================================= */
 
 #timelineOverlay {
@@ -256,6 +256,7 @@
     let subtitleCues = [];
     let subtitleOffsetMs = 0;
     let subtitlesVisible = true;
+    let subtitleRendererTimer = null;
 
     let watcherCastPlaybackMode = "direct";
     let sourceStartSeconds = 0;
@@ -602,24 +603,42 @@
         return cues;
     }
 
-    // Toont elke 100ms de juiste ondertitel op basis van video.currentTime.
+    /*
+     * V125 subtitle seek fix:
+     *
+     * Bij live transcode begint iedere nieuwe seek-generatie als een nieuw
+     * videobestand waarvan video.currentTime opnieuw bij 0 begint.
+     *
+     * effectivePositionSeconds() geeft daarentegen de echte brontijd:
+     * sourceStartSeconds + video.currentTime.
+     *
+     * Directe video's blijven automatisch gewoon video.currentTime gebruiken.
+     */
     function startSubtitleOverlayRenderer() {
-        setInterval(() => {
-            if (!video || !subtitleBox || subtitleCues.length === 0) return;
-            if (!subtitlesVisible) {
-            subtitleBox.innerHTML = "";
+        if (subtitleRendererTimer !== null) {
             return;
         }
 
+        subtitleRendererTimer = setInterval(() => {
+            if (!video || !subtitleBox) {
+                return;
+            }
+
+            if (!subtitlesVisible || subtitleCues.length === 0) {
+                subtitleBox.innerHTML = "";
+                return;
+            }
+
             const now =
-            video.currentTime -
-            (subtitleOffsetMs / 1000);
+                effectivePositionSeconds() -
+                (subtitleOffsetMs / 1000);
 
             const activeCue = subtitleCues.find(cue =>
                 now >= cue.start && now <= cue.end
             );
 
-            subtitleBox.innerHTML = activeCue ? activeCue.text : "";
+            subtitleBox.innerHTML =
+                activeCue ? activeCue.text : "";
         }, 100);
     }
 
@@ -645,6 +664,13 @@
 
             // setStatus("Video laden...");
             configureTimelineForMedia(media);
+
+            // Oude cue nooit kort laten doorlopen tijdens een nieuwe LOAD/seek.
+            subtitleBox.innerHTML = "";
+            subtitleCues = [];
+
+            // Eén renderer voor de volledige receiverlevensduur.
+            startSubtitleOverlayRenderer();
 
             standbyScreen.style.display = "none";
             video.style.display = "block";
@@ -680,9 +706,8 @@ if (tracks.length > 0) {
 
                     subtitleCues = cues;
 
-                    // Subtitle succesvol geladen. Geen melding nodig.
-
-                    startSubtitleOverlayRenderer();
+                    // Subtitle succesvol geladen. De bestaande renderer
+                    // gebruikt direct de nieuwe cue-lijst.
 
                 } else {
 
