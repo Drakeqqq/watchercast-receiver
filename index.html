@@ -257,6 +257,7 @@
     let subtitleOffsetMs = 0;
     let subtitlesVisible = true;
     let subtitleRendererTimer = null;
+    let audioFeedbackUntilMs = 0;
 
     let watcherCastPlaybackMode = "direct";
     let sourceStartSeconds = 0;
@@ -327,6 +328,11 @@
 }
 
     function setStatus(text, timeoutMs = 2000) {
+    // De Ratio-startmelding mag een net gekozen Audiovertraging niet
+    // meteen overschrijven tijdens de automatische streamherstart.
+    if (text.startsWith("Ratio:") && Date.now() < audioFeedbackUntilMs) {
+        return;
+    }
     statusBox.textContent = text;
     statusBox.style.display = "block";
 
@@ -338,6 +344,12 @@
         }, timeoutMs);
     }
 }
+
+    function formatOffsetFeedback(value) {
+        const offset = Number(value);
+        const safe = Number.isFinite(offset) ? offset : 0;
+        return (safe > 0 ? "+" : "") + safe + " ms";
+    }
 
     function finiteNumber(value, fallback = 0) {
         const number = Number(value);
@@ -890,11 +902,17 @@ context.addCustomMessageListener(CONTROL_NAMESPACE, event => {
             }
         }
 
+        if (command.action === "audioOffsetPreview") {
+            // Alleen weergave: de Android-app past de echte audio na 1 s toe.
+            audioFeedbackUntilMs = Date.now() + 2000;
+            setStatus("Audiovertraging: " + formatOffsetFeedback(command.offset));
+        }
+
         if (command.action === "subtitleOffset") {
             subtitleOffsetMs = Number(command.offset || 0);
 
             if (command.silent !== true) {
-                setStatus("Subtitle offset: " + subtitleOffsetMs + " ms");
+                setStatus("Ondertitelvertraging: " + formatOffsetFeedback(subtitleOffsetMs));
             }
         }
 
